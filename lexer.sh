@@ -1,4 +1,5 @@
 #!/bin/bash
+set +x
 stop() {
   message=${1:-"OK (/)"}
   exit_code=${2:-0}
@@ -62,7 +63,7 @@ from_source_file=${INFLILE} # play it save
 ORIG_IFS="$IFS"
 IFS=$'|\n;' ; read -d '' -a  source_code  < ${from_source_file} # don't stop on 'pipes', 'newlines' and 'semicolons'
 IFS="$ORIG_IFS"
-if [[ ${DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi #
+#if [[ ${DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi #
 
 
 CHAR_AMPERSAND='&'
@@ -81,13 +82,13 @@ CHAR_PARAN_CLOSE=')'
 CHAR_QUOTE="'"
 CHAR_DOUBLE_QUOTE='"'
 CHAR_CURLY_OPEN='{'
-CHAR_CURLY_CLOSE='{'
+CHAR_CURLY_CLOSE='}'
 CHAR_MUL='*'
 CHAR_DIV='/'
 CHAR_TAB='\t'
 
 function lex () {
-c=${1}
+c="${1}"
 case "${c}" in
 # Ignore (line breaking) white spacce
     [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}"|"${CHAR_CARRIAGE_RETURN}") 
@@ -97,15 +98,16 @@ case "${c}" in
         return 0;
         ;;
 # special character        
-     ${CHAR_PARAN_OPEN}|${CHAR_PARAN_CLOSE}|${CHAR_CURLY_OPEN}|${CHAR_PARAN_CLOSE}|${CHAR_COMMA}|${CHAR_SEMICOLON}|${CHAR_EQUAL_SIGN}|${CHAR_COLON})
+     ${CHAR_PARAN_OPEN}|${CHAR_PARAN_CLOSE}|${CHAR_CURLY_OPEN}|${CHAR_CURLY_CLOSE}|${CHAR_COMMA}|${CHAR_SEMICOLON}|${CHAR_EQUAL_SIGN}|${CHAR_COLON})
 #     [[:punct:]])
         echo "yield(c, \"\") # >>${c}<< is a special character "
-        exec ${0} "-c '${c}' -b '${source_code[$CURR_LINE]}'" 
+        exec "${0}" -c "${c}" -b "${source_code[$CURR_LINE]}" -g 
         ;;
 # operator
      ${CHAR_PLUS_SIGN}|${CHAR_MINUS_SIGN}|\${CHAR_MUL}|${CHAR_DIV})
         echo "yield (\"operation\", c)' # operator >>${c}<<"
-        exec ${0} -g "-e 'operation' -c '${c}' -b '${source_code[$CURR_LINE]}'"
+#        exec "${0}" -e "operation" -c "${c}" -b "${source_code[$CURR_LINE]}" -g
+        "${0}" -e "operation" -c "${c}" -b "${source_code[$CURR_LINE]}" -g
         ;;
 # string
      ${CHAR_QUOTE}|${CHAR_DOUBLE_QUOTE})
@@ -136,8 +138,24 @@ function PeekableString () {
 amount_of_lines=${#source_code[*]}
 
 #source test.sh
-if [[ ! -z ${CHAR} ]] 
-then
-   lex "${CHAR}"
-fi
+### if [[ ! -z ${CHAR} ]] 
+### then
+###    lex "${CHAR}"
+### fi
+
+   line=${source_code[line_no]}
+   chars=${#line}
+
+   for (( prev_char=-1, curr_char=0, next_char=1; curr_char<$(( $chars )); curr_char++, prev_char=curr_char-1, next_char=curr_char+1 ))
+   do
+      echo "#$line_no: $prev_char,$curr_char,$next_char;'${source_code[$CURR_LINE]}' char='${source_code[$line_no]:$curr_char:1}'"
+
+      lex "${source_code[$line_no]:$curr_char:1}"
+
+#      echo "< prev_char '${source_code[$line_no]:$prev_char:1}'"
+#      echo "| curr_char   '${source_code[$line_no]:$curr_char:1}'"
+#      echo "> next_char    '${source_code[$line_no]:$next_char:1}'"
+
+   done
+
 stop
