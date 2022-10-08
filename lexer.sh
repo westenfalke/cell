@@ -44,6 +44,7 @@ echo ${source_code[$NEXT_LINE]}
 CHAR_AMPERSAND='&'
 CHAR_EOF=EOF
 CHAR_NEWLINE='\n'
+CHAR_CARRIAGE_RETURN='\r'
 CHAR_PIPE='|'
 CHAR_SEMICOLON=';'
 CHAR_COLON=':'
@@ -65,9 +66,9 @@ function lex () {
 c=${1}
 case "${c}" in
 # Ignore (line breaking) white spacce
-#    [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}") 
-#    [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}") 
-    [[:space:]]) 
+    [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}"|"${CHAR_CARRIAGE_RETURN}") 
+#    [[:space:]]|"${CHAR_NEWLINE}) 
+#    [[:space:]]) 
         echo "pass:  # >>${c}<< is a [line breaking] whitspace"
         ;;
 # special character        
@@ -105,7 +106,6 @@ function PeekableString () {
     return
 }
 
-exit 0
 
 function test () {
    lex ${CHAR_PARAN_OPEN}
@@ -125,12 +125,14 @@ function test () {
    lex "'"
    lex '\t'
    lex ${CHAR_NEWLINE}
+   lex ${CHAR_CARRIAGE_RETURN}
    lex ' '
    lex " "
    return 0
 }
 
 test
+exit 0
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ ))
