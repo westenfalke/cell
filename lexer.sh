@@ -86,7 +86,6 @@ CHAR_DIV='/'
 CHAR_TAB='\t'
 PASS='0'
 
-
 function lex () {
 local c="${1}"
 echo lexi I "${c}"
@@ -137,8 +136,9 @@ case "${c}" in
       symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)*" <<< ${buff})
       echo "symbol '${symbol}'"
       if [[ ! (${#symbol} -lt ${#buff}) ]]; then buff=${CHAR_SEMICOLON} ; fi
-      echo "new buff '${buff: -(${#buff}-${#symbol})}'"
-      lex "${CHAR_SEMICOLON}" "${buff: -(${#buff}-${#symbol})}" "symbol"
+      echo "new buff '${buff:${#symbol}:${#buff}}'"
+      echo lex "'${CHAR_SEMICOLON}' '${buff:${#symbol}:${#buff}}' 'symbol'"
+      lex "${CHAR_SEMICOLON}" "${buff:${#symbol}:${#buff}}" "symbol"
    ;;
    # TAB not allowed
    "${CHAR_TAB}")
