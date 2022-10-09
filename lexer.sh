@@ -88,65 +88,87 @@ PASS='0'
 
 function lex () {
 local c="${1}"
-echo lexi I "${c}"
-#if [[ "${CHAR_SEMICOLON}" == "${c}" ]]; then return ; fi
-echo lexi II
 local buff="${2}"
-if [[ -z "${buff}" ]]; then return ; fi
-local token=${3:-unset}
+local token="${3}"
+echo "IN : c='${c}' buff='${buff}' [${#buff}] token='${token}'"
+
+if [[ 1 -gt "${#buff}" ]]; then return ; fi # here it's about time for the nest line of code
+if [[ 1 -gt "${#c}"    ]]; then return ; fi
+
 case "${c}" in
    # Ignore (line breaking) white spacce
    [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}"|"${CHAR_CARRIAGE_RETURN}") 
       echo "pass:  # >>${c}<< is a [line breaking] whitspace"
-      echo "'${c}' '${buff}' '${token}'"
-      return ${PASS};
+      token='whitspace'
+      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
+      buff="${buff: -(${#buff}-1)}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      lex "${c}" "${buff}" "${token}"
    ;;
    # special character        
    ${CHAR_PARAN_OPEN}|${CHAR_PARAN_CLOSE}|${CHAR_CURLY_OPEN}|${CHAR_CURLY_CLOSE}|${CHAR_COMMA}|${CHAR_SEMICOLON}|${CHAR_EQUAL_SIGN}|${CHAR_COLON})
-      echo "yield(c, \"\") # >>${c}<< is a special character "
-      echo "'${c}' '${buff}' '${token}'"
-      if [[ "${buff:1:1}" == "${buff: -(${#buff}-1)}" ]]; then buff=${CHAR_SEMICOLON} ; fi
-      lex  ${buff:1:1} ${buff: -(${#buff}-1)}
+      #echo "yield(c, '') # is a special character "
+      token='special'
+      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
+      buff="${buff: -(${#buff}-1)}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      lex "${c}" "${buff}" "${token}"
    ;;
    # operator
    ${CHAR_PLUS_SIGN}|${CHAR_MINUS_SIGN}|\${CHAR_MUL}|${CHAR_DIV})
-      echo "yield (\"operation\", c)' # operator >>${c}<<"
-      echo "'${c}' '${buff}' '${token}'"
-      if [[ "${buff:1:1}" == "${buff: -(${#buff}-1)}" ]]; then buff=${CHAR_SEMICOLON} ; fi
-      echo lex  ${buff:1:1} ${buff: -(${#buff}-1)} "operation"
-      lex  ${buff:1:1} ${buff: -(${#buff}-1)} "operation"
+      #echo "yield ('operation', c) # operator >>${c}<< "
+      token='operation'
+      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
+      buff="${buff: -(${#buff}-1)}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      lex "${c}" "${buff}" "${token}"
    ;;
    # string
    ${CHAR_QUOTE}|${CHAR_DOUBLE_QUOTE})
-      echo "yield (\"string\", _scan_string(c, chars)) # >>${c}<<"
-      echo "'${c}' '${buff}' '${token}'"
-      if [[ "${buff:1:1}" == "${buff: -(${#buff}-1)}" ]]; then buff=${CHAR_SEMICOLON} ; fi
-      echo lex  ${buff:1:1} ${buff: -(${#buff}-1)} "string"
-      lex  ${buff:1:1} ${buff: -(${#buff}-1)} "string"
+      #echo "yield ('string', _scan_string(c, chars)) # >>${c}<<"
+      token='string'
+      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
+      buff="${buff: -(${#buff}-1)}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      #lex "${c}" "${buff}" "${token}"
    ;;
    # number
    [[:digit:]])
-      echo "yield (\"number\", _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
-      echo "'${c}' '${buff}' '${token}'"
+      #echo "yield ('number', _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
+      token='number'
+      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      #lex "${c}" "${buff}" "${token}"
    ;;
-   # symbole
+   # symbols
    [[:alpha:]])
-      echo 'yield ("symbol", _scan(c, chars, "[_a-zA-Z0-9]"))'
-      echo "'${c}' '${buff}' '${token}'"
+      #echo 'yield ('symbol', _scan(c, chars, "[_a-zA-Z0-9]"))'
+      token="symbol"
       symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)*" <<< ${buff})
-      echo "symbol '${symbol}'"
-      if [[ ! (${#symbol} -lt ${#buff}) ]]; then buff=${CHAR_SEMICOLON} ; fi
-      echo "new buff '${buff:${#symbol}:${#buff}}'"
-      echo lex "'${CHAR_SEMICOLON}' '${buff:${#symbol}:${#buff}}' 'symbol'"
-      lex "${CHAR_SEMICOLON}" "${buff:${#symbol}:${#buff}}" "symbol"
+      echo "symbol='${symbol}' [${#symbol}]"
+      if [[ ${#symbol} -eq ${#buff} ]]; then buff=""; fi
+      buff="${buff:${#symbol}:${#buff}}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      if [[ 1 -gt ${#buff} ]]; then return; fi
+      lex "${c}" "${buff}" "${token}"
    ;;
    # TAB not allowed
    "${CHAR_TAB}")
-      echo "'${c}' '${buff}' '${token}'"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
       echo "raise Exception(\"Tabs >>${c}<< are not allowed in Cell\")"
       ;;
    *)
-      echo "'${c}' '${buff}' '${token}'"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
       echo "raise Exception(\"Unexpected character: >>${c}<<\")"
    ;;
 esac
@@ -177,7 +199,6 @@ if [[ ${BUFFER} ]]; then
 ####      lex "${source_code[$line_no]:$curr_char:1}"
 ###
 ###      lex "${line:$curr_char:1}"
-      echo START lex  "${line:0:1}" "${line}"
       lex  "${line:0:1}" "${line}"
 stop
 ###
