@@ -90,7 +90,7 @@ function lex () {
 local c="${1}"
 local buff="${2}"
 local token="${3}"
-echo "IN : c='${c}' buff='${buff}' [${#buff}] token='${token}'"
+echo "IN : c='${c}' buff='${buff}' [${#buff}]" #  token='${token}'"
 
 if [[ 1 -gt "${#buff}" ]]; then return ; fi # here it's about time for the nest line of code
 if [[ 1 -gt "${#c}"    ]]; then return ; fi
@@ -98,12 +98,13 @@ if [[ 1 -gt "${#c}"    ]]; then return ; fi
 case "${c}" in
    # Ignore (line breaking) white spacce
    [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}"|"${CHAR_CARRIAGE_RETURN}") 
-      echo "pass:  # >>${c}<< is a [line breaking] whitspace"
+      #echo "pass:  # >>${c}<< is a [line breaking] whitspace"
       token='whitspace'
+      echo "token='${token}'" 
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
       c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]" 
       if [[ 1 -gt ${#buff} ]]; then return; fi
       lex "${c}" "${buff}" "${token}"
    ;;
@@ -111,10 +112,11 @@ case "${c}" in
    ${CHAR_PARAN_OPEN}|${CHAR_PARAN_CLOSE}|${CHAR_CURLY_OPEN}|${CHAR_CURLY_CLOSE}|${CHAR_COMMA}|${CHAR_SEMICOLON}|${CHAR_EQUAL_SIGN}|${CHAR_COLON})
       #echo "yield(c, '') # is a special character "
       token='special'
+      echo "token='${token}'" 
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
       c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       if [[ 1 -gt ${#buff} ]]; then return; fi
       lex "${c}" "${buff}" "${token}"
    ;;
@@ -122,10 +124,12 @@ case "${c}" in
    ${CHAR_PLUS_SIGN}|${CHAR_MINUS_SIGN}|\${CHAR_MUL}|${CHAR_DIV})
       #echo "yield ('operation', c) # operator >>${c}<< "
       token='operation'
+      echo "token='${token}'" 
+      stop "paw '(${#buff}-1)'" '3'
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
       c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       if [[ 1 -gt ${#buff} ]]; then return; fi
       lex "${c}" "${buff}" "${token}"
    ;;
@@ -133,42 +137,59 @@ case "${c}" in
    ${CHAR_QUOTE}|${CHAR_DOUBLE_QUOTE})
       #echo "yield ('string', _scan_string(c, chars)) # >>${c}<<"
       token='string'
-      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
-      buff="${buff: -(${#buff}-1)}"
+      echo "token='${token}'" 
+      pattern="[${c}](.*){0,}[${c}]"
+      echo "pattern='${pattern}'"
+      string_plus_quotes="$(grep -o -P "${pattern}" <<< ${buff})"
+      string_len_plus_quotes="${#string_plus_quotes}"
+      if [[ ${string_plus_quotes: -1} != ${c} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
+      string=${string_plus_quotes:1:-1}
+      string_len="${#string}"
+      echo "string_plus_quotes='${string_plus_quotes}' [${string_len_plus_quotes}] string='${string}' [${string_len}] "
+      buff="${buff:${string_len_plus_quotes}:${#buff}}"
       c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       if [[ 1 -gt ${#buff} ]]; then return; fi
-      #lex "${c}" "${buff}" "${token}"
+      lex "${c}" "${buff}" "${token}"
    ;;
    # number
-   [[:digit:]])
+   '[[:digit:]]')
       #echo "yield ('number', _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
       token='number'
-      if [[ 2 -gt ${#buff} ]]; then buff=""; fi
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "token='${token}'" 
+      number=$(grep -o -E "(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)" <<< ${buff})
+      if [[ ${number} == '' ]]; then stop "'.' is not a number" '1' ; fi
+      echo "number='${number}' [${#number}]"
+      if [[ ${#number} -eq ${#buff} ]]; then buff=""; fi
+      buff="${buff:${#number}:${#buff}}"
+      c="${buff:0:1}"
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       if [[ 1 -gt ${#buff} ]]; then return; fi
-      #lex "${c}" "${buff}" "${token}"
+      lex "${c}" "${buff}" "${token}"
    ;;
    # symbols
    [[:alpha:]])
       #echo 'yield ('symbol', _scan(c, chars, "[_a-zA-Z0-9]"))'
       token="symbol"
+      echo "token='${token}'" 
       symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)*" <<< ${buff})
       echo "symbol='${symbol}' [${#symbol}]"
       if [[ ${#symbol} -eq ${#buff} ]]; then buff=""; fi
       buff="${buff:${#symbol}:${#buff}}"
       c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       if [[ 1 -gt ${#buff} ]]; then return; fi
       lex "${c}" "${buff}" "${token}"
    ;;
    # TAB not allowed
    "${CHAR_TAB}")
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       echo "raise Exception(\"Tabs >>${c}<< are not allowed in Cell\")"
       ;;
    *)
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}] token='${token}'" 
+      echo "token='${token}'" 
+      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
       echo "raise Exception(\"Unexpected character: >>${c}<<\")"
    ;;
 esac
