@@ -1,9 +1,15 @@
 #!/bin/bash
+#set -x
+#set -e
+exec 3>&1 1>&2
 stop() {
-  message=${1:-"OK (/)"}
-  exit_code=${2:-0}
-  printf >&2 '%s (%i)\n' "${message}" "${exit_code}"
-  exit "${exit_code}"
+   message=${1:-"OK (/)"}
+   exit_code=${2:-0}
+
+   if [[ ${exit_code} -gt 0 ]] || [[ ${DEBUG} ]]; then 
+      printf '%s (%i)\n' "${message}" "${exit_code}"
+   fi
+   exit "${exit_code}"
 }
 
 DEV_NULL="/dev/null"
@@ -19,7 +25,6 @@ usage()
                         [ -c | --char a singe char ] 
                         [ -e | --expression (operation|string|number|symbol)]
                         [filename]"
-  stop "Invalid argument" '22'
 }
 
 PARSED_ARGUMENTS=$(getopt -a -n ${0} -o g,b:c:e: --long debug,buffer:,char:,expression: -- "$@")
@@ -35,33 +40,38 @@ do
     -g | --debug)      DEBUG=1         ; shift   ;;
     -b | --buffer)     BUFFER="$2"     ; shift 2 ;;
     -c | --char)       CHAR="$2"       ; shift 2 ;;
-    -e | --expression) EXPRESSION="$2" ; shift 2 ;;
+    -e | --expression) EXPRESSION="$3" ; shift 2 ;;
     # -- means the end of the arguments; drop this, and break out of the while loop
     --) shift; break ;;
     # If invalid options were passed, then getopt should have reported an error,
     # which we checked as VALID_ARGUMENTS when getopt was called...
     *) echo "Famous Last Words - Unexpected option: $1 - this should not happen."
-       usage ;;
+       usage 
+       stop "Unkown Parameter or option found" '22'
+
+   ;;
   esac
 done
 
-INFLILE="${1:-${DEV_NULL}}"
+INFLILE="${1:-${DEV_NULL}}" && shift # play it save
+#INFLILE="${1}"&& shift #
 if [[ ${DEBUG} ]]; then 
-   echo "PARSED_ARGUMENTS is $PARSED_ARGUMENTS"
-   echo "DEBUG   : ${DEBUG}"
-   echo "BUFFER  : ${BUFFER}"
-   echo "CHAR    : ${CHAR}"
-   echo "EXPRESSION   : ${EXPRESSION}"
-   echo "INFLILE : ${INFLILE}"
-   echo "Parameters remaining are: ${@}"
+   echo "PARSED_ARGUMENTS is '$PARSED_ARGUMENTS'"
+   echo "DEBUG      : '${DEBUG}'"
+   echo "BUFFER     : '${BUFFER}'"
+   echo "CHAR       : '${CHAR}'"
+   echo "EXPRESSION : '${EXPRESSION}'"
+   echo "INFLILE    : '${INFLILE}'"
+   echo "Parameters remaining are: '${@}'"
 fi
 
-from_source_file=${INFLILE} # play it save
+if [[ ! -r ${INFLILE} ]]; then stop "file '${INFLILE}' not readable or does not exist" '22' ; fi
+from_source_file=${INFLILE}
  
 ORIG_IFS="$IFS"
 IFS=$'|\n;' ; read -d '' -a  source_code  < ${from_source_file} # don't stop on 'pipes', 'newlines' and 'semicolons'
 IFS="$ORIG_IFS"
-#if [[ ${DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi #
+if [[ ${DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
 
 CHAR_AMPERSAND='&'
@@ -86,110 +96,97 @@ CHAR_DIV='/'
 CHAR_TAB='\t'
 PASS='0'
 
+buff=''
+c=''
+token=''
+
+
 function lex () {
-local c="${1}"
-local buff="${2}"
-local token="${3}"
-echo "IN : c='${c}' buff='${buff}' [${#buff}]" #  token='${token}'"
+
+buff="${1}"
+c="${buff:0:1}"
+token="${2}"
+
+#echo -n "${token} " >&3
+echo "${token} " >&3
+
+if [[ ${DEBUG} ]]; then
+   echo "token = »${token}«"
+   echo "c = »${c}«"              
+   echo "buff = »${buff}« [${#buff}]"
+fi
 
 if [[ 1 -gt "${#buff}" ]]; then return ; fi # here it's about time for the nest line of code
 if [[ 1 -gt "${#c}"    ]]; then return ; fi
 
 case "${c}" in
-   # Ignore (line breaking) white spacce
-   [[:space:]]|"${CHAR_NEWLINE}"|"${CHAR_TAB}"|"${CHAR_CARRIAGE_RETURN}") 
-      #echo "pass:  # >>${c}<< is a [line breaking] whitspace"
-      token='whitspace'
-      echo "token='${token}'" 
+   # Ignore whitespacce
+   [[:space:]]) 
+      ###"pass:  # >>${c}<< is a [line breaking] whitspace"
+      token="('whitspace', '')"
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]" 
       if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # special character        
    "${CHAR_PARAN_OPEN}"|"${CHAR_PARAN_CLOSE}"|"${CHAR_CURLY_OPEN}"|"${CHAR_CURLY_CLOSE}"|"${CHAR_COMMA}"|"${CHAR_SEMICOLON}"|"${CHAR_EQUAL_SIGN}"|"${CHAR_COLON}")
-      #echo "yield(c, '') # is a special character "
-      token='special'
-      echo "token='${token}'" 
+      ###"yield(c, '') # is a special character "
+      token="('${c}', '')"
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # operator
    "${CHAR_PLUS_SIGN}"|"${CHAR_MINUS_SIGN}"|"\${CHAR_MUL}"|"${CHAR_DIV}")
-      #echo "yield ('operation', c) # operator >>${c}<< "
-      token='operation'
-      echo "token='${token}'" 
+      ###"yield ('operation', c) # operator >>${c}<< "
+      token="('operation', '${c}')"
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # string
    "${CHAR_QUOTE}"|"${CHAR_DOUBLE_QUOTE}")
-      #echo "yield ('string', _scan_string(c, chars)) # >>${c}<<"
-      token='string'
-      echo "token='${token}'" 
-      pattern="[${c}](.*){0,}[${c}]"
-      echo "pattern='${pattern}'"
-      string_plus_quotes="$(grep -o -P "${pattern}" <<< ${buff})"
+      ###"yield ('string', _scan_string(c, chars)) # >>${c}<<"
+      pattern="([\ a-zA-Z0-9.:,;%?=&$§^#_\(\)\{\})\[\]]){0,}"
+      string_plus_quotes="$(grep -o -P "[${c}]${pattern}[${c}]" <<< ${buff})"
       string_len_plus_quotes="${#string_plus_quotes}"
       if [[ ${string_plus_quotes: -1} != ${c} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
       string=${string_plus_quotes:1:-1}
+      token="('string', '${string}')"
       string_len="${#string}"
-      echo "string_plus_quotes='${string_plus_quotes}' [${string_len_plus_quotes}] string='${string}' [${string_len}] "
+      ###"string_plus_quotes='${string_plus_quotes}' [${string_len_plus_quotes}] string='${string}' [${string_len}] "
       buff="${buff:${string_len_plus_quotes}:${#buff}}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # number
    [[:digit:]])
-      #echo "yield ('number', _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
-      token='number'
-      echo "token='${token}'" 
-      number=$(grep -o -E "(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)" <<< ${buff})
+      ###"yield ('number', _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
+      #pattern="(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)"
+      pattern="[0-9]+\.[0-9]+"
+      pattern='[+-]?[0-9]+([.][0-9]+)?'
+      number=$(grep -o -E "${pattern}" <<< ${buff})
       if [[ ${number} == '' ]]; then stop "'${c}' is not a number" '1' ; fi
-      echo "number='${number}' [${#number}]"
+      token="('number', '${number}')"
       if [[ ${#number} -eq ${#buff} ]]; then buff=""; fi
       buff="${buff:${#number}:${#buff}}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # symbols
    [[:alpha:]])
-      #echo 'yield ('symbol', _scan(c, chars, "[_a-zA-Z0-9]"))'
-      token="symbol"
-      echo "token='${token}'" 
+      ###'yield ('symbol', _scan(c, chars, "[_a-zA-Z0-9]"))'
       symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)*" <<< ${buff})
-      echo "symbol='${symbol}' [${#symbol}]"
+      token="('symbol', '${symbol}')"
       if [[ ${#symbol} -eq ${#buff} ]]; then buff=""; fi
       buff="${buff:${#symbol}:${#buff}}"
-      c="${buff:0:1}"
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      if [[ 1 -gt ${#buff} ]]; then return; fi
-      lex "${c}" "${buff}" "${token}"
+      lex "${buff}" "${token}"
    ;;
    # TAB not allowed
    "${CHAR_TAB}")
-      echo "token='${token}'" 
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      echo "raise Exception(\"Tabs >>${c}<< are not allowed in Cell\")"
+      stop "raise Exception(\"Tabs >>${c}<< are not allowed in Cell\")" '1'
       ;;
    *)
-      echo "token='${token}'" 
-      echo "OUT: c='${c}' buff='${buff}' [${#buff}]"
-      echo "raise Exception(\"Unexpected character: >>${c}<<\")"
+      stop "raise Exception(\"Unexpected character: >>${c}<<\")" '1'
    ;;
 esac
 }
@@ -208,10 +205,12 @@ amount_of_lines=${#source_code[*]}
 
 #   line=${source_code[line_no]}
 #   chars=${#line}
+
 if [[ ${BUFFER} ]]; then
-   line=${BUFFER}
+   line=$(tr -d '\n\r\t' <<< ${BUFFER})
    chars=${#line}
-      lex  "${line:0:1}" "${line}"
+      lex "${line}" "('BUFFER', '${line}')"
+      #echo ${result} >&3
 stop 'EOF'
 fi
 
