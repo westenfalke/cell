@@ -1,6 +1,4 @@
 #!/bin/bash
-#set -x
-#set -e
 exec 3>&1 1>&2
 stop() {
    message=${1:-"OK (/)"}
@@ -61,7 +59,6 @@ if [[ ${DEBUG} ]]; then
    echo "BUFFER     : '${BUFFER}'"
    echo "CHAR       : '${CHAR}'"
    echo "EXPRESSION : '${EXPRESSION}'"
-   echo "INFLILE    : '${INFLILE}'"
    echo "Parameters remaining are: '${@}'"
 fi
 
@@ -72,7 +69,6 @@ ORIG_IFS="$IFS"
 IFS=$'|\n;' ; read -d '' -a  source_code  < ${from_source_file} # don't stop on 'pipes', 'newlines' and 'semicolons'
 IFS="$ORIG_IFS"
 if [[ ${DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
-
 
 CHAR_AMPERSAND='&'
 CHAR_EOF=EOF
@@ -100,7 +96,6 @@ buff=''
 c=''
 token=''
 
-
 function lex () {
 
 buff="${1}"
@@ -108,7 +103,7 @@ c="${buff:0:1}"
 token="${2}"
 
 #echo -n "${token} " >&3
-echo "${token} " >&3
+if [[ ! -z ${token} ]]; then echo "${token} " >&3 ; fi
 
 if [[ ${DEBUG} ]]; then
    echo "token = »${token}«"
@@ -123,7 +118,7 @@ case "${c}" in
    # Ignore whitespacce
    [[:space:]]) 
       ###"pass:  # >>${c}<< is a [line breaking] whitspace"
-      token="('whitspace', '')"
+      token=''
       if [[ 2 -gt ${#buff} ]]; then buff=""; fi
       buff="${buff: -(${#buff}-1)}"
       if [[ 1 -gt ${#buff} ]]; then return; fi
@@ -155,18 +150,16 @@ case "${c}" in
       string=${string_plus_quotes:1:-1}
       token="('string', '${string}')"
       string_len="${#string}"
-      ###"string_plus_quotes='${string_plus_quotes}' [${string_len_plus_quotes}] string='${string}' [${string_len}] "
       buff="${buff:${string_len_plus_quotes}:${#buff}}"
       lex "${buff}" "${token}"
    ;;
    # number
-   [[:digit:]])
-      ###"yield ('number', _scan(c, chars, \"[.0-9]\"))# >>${c}<<"
-      #pattern="(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)"
-      pattern="[0-9]+\.[0-9]+"
-      pattern='[+-]?[0-9]+([.][0-9]+)?'
-      number=$(grep -o -E "${pattern}" <<< ${buff})
-      if [[ ${number} == '' ]]; then stop "'${c}' is not a number" '1' ; fi
+   [[:digit:]]|".")
+      ###"yield ('number', _scan(c, chars, '[.0-9]))# >>${c}<<"
+      sloppy=""
+      pattern="(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)"
+      number=$(grep -Eo "${pattern}" <<< ${buff})
+      if [[ ${number} == '' ]]; then stop "'$(grep -Eo "[-+0-9.]*" <<< ${buff})' is not a number" '1' ; fi
       token="('number', '${number}')"
       if [[ ${#number} -eq ${#buff} ]]; then buff=""; fi
       buff="${buff:${#number}:${#buff}}"
@@ -191,41 +184,16 @@ case "${c}" in
 esac
 }
 
-function PeekableString () {
-    return
-}
-
-amount_of_lines=${#source_code[*]}
-
-#source test.sh
-### if [[ ! -z ${CHAR} ]] 
-### then
-###    lex "${CHAR}"
-### fi
-
-#   line=${source_code[line_no]}
-#   chars=${#line}
-
 if [[ ${BUFFER} ]]; then
    line=$(tr -d '\n\r\t' <<< ${BUFFER})
    chars=${#line}
       lex "${line}" "('BUFFER', '${line}')"
-      #echo ${result} >&3
-stop 'EOF'
 fi
 
-
-###   for (( prev_char=-1, curr_char=0, next_char=1; curr_char<$(( $chars )); curr_char++, prev_char=curr_char-1, next_char=curr_char+1 ))
-###   do
-####      echo "#$line_no: $prev_char,$curr_char,$next_char;'${source_code[$CURR_LINE]}' char='${source_code[$line_no]:$curr_char:1}'"
-####      echo "$prev_char,$curr_char,$next_char;'${line}' char='${line:$curr_char:1}'"
-###
-####      lex "${source_code[$line_no]:$curr_char:1}"
-###
-###      lex "${line:$curr_char:1}"
-###
-####      echo "< prev_char '${source_code[$line_no]:$prev_char:1}'"
-####      echo "| curr_char   '${source_code[$line_no]:$curr_char:1}'"
-####      echo "> next_char    '${source_code[$line_no]:$next_char:1}'"
-
-###   done
+amount_of_lines=${#source_code[*]}
+if [[ amount_of_lines -gt 0 ]]; then
+   for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
+      line=${source_code[line_no]}
+      lex "${line}${CHAR_SEMICOLON}" "('LINE_${line_no}', '${line}${CHAR_SEMICOLON}')"
+   done
+fi
