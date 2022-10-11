@@ -1,0 +1,11 @@
+print("first line of cell code");
+a = .1;
+b = 0.2;
+c = b + 4;
+print(c);
+print('in the middle of cell code');
+d = 8;
+e = 16;
+f = e + 32;
+print(f);
+print("last line of cell code");
