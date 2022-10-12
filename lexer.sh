@@ -129,27 +129,22 @@ function lex () {
       case "${C}" in
          [[:space:]]) 
             TOKEN="${_EMPTY_TOKEN_}"
-            if [[ 2 -gt ${#BUFF} ]]; then BUFF=""; fi
             AMOUNT_OF_PROCESSED_CHARS=1
          ;;
          "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
             TOKEN="('${C}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
-            if [[ 2 -gt ${#BUFF} ]]; then BUFF=""; fi
             AMOUNT_OF_PROCESSED_CHARS=1
          ;;
          "${_PLUS_SIGN_}"|"${_MINUS_SIGN_}"|"\${_MUL_}"|"${_DIV_}")
             TOKEN="('${_OPERATION_TOKEN_}', '${C}')"
-            if [[ 2 -gt ${#BUFF} ]]; then BUFF=""; fi
             AMOUNT_OF_PROCESSED_CHARS=1
          ;;
          "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
             pattern="([\ a-zA-Z0-9.:,;%?=&$§^#_\(\)\{\})\[\]]){0,}"
             string_plus_quotes="$(grep -o -P "[${C}]${pattern}[${C}]" <<< ${BUFF})"
-            string_len_plus_quotes="${#string_plus_quotes}"
             if [[ ${string_plus_quotes: -1} != ${C} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
             string=${string_plus_quotes:1:-1}
             TOKEN="('${_STRING_TOKEN_}', '${string}')"
-            string_len="${#string}"
             AMOUNT_OF_PROCESSED_CHARS="${#string_plus_quotes}"
          ;;
          [[:digit:]]|".")
@@ -158,7 +153,6 @@ function lex () {
             number=$(grep -Eo "${pattern}" <<< ${BUFF})
             if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${sloppy}" <<< ${BUFF})' is not a number" '1' ; fi
             TOKEN="('${_NUMBER_TOKEN_}', '${number}')"
-            #if [[ ${#number} -eq ${#BUFF} ]]; then BUFF=""; fi
             AMOUNT_OF_PROCESSED_CHARS="${#number}"
          ;;
          [[:alpha:]])
