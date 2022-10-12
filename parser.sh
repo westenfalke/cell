@@ -107,88 +107,28 @@ set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
+
 ################################################################################
-### start of function lex ######################################################
+### start of function pars #####################################################
 ################################################################################
-function lex () {
-   declare lex_buff="${1}"
-   declare lex_token="${2}"
-   declare lex_c
-   declare -i lex_amount_of_processed_chars=0
-   while [[ true ]]; do
-      lex_buff=${lex_buff:${lex_amount_of_processed_chars}}
-      lex_c="${lex_buff:0:1}"
-      if [[ ! -z ${lex_token} ]]; then echo "${lex_token} " >&3 ; fi
-      #############################
-      [[ 0 -lt ${#lex_buff} ]] || break
-      #############################      
-      if [[ ${OPT_VERBOSE} ]]; then
-         echo "lex_token = »${lex_token}« [${lex_amount_of_processed_chars}]"
-         echo "lex_c = »${lex_c}«"              
-         echo "lex_buff = »${lex_buff}« [${#lex_buff}]"
-      fi      
-      case "${lex_c}" in
-         [[:space:]]) 
-            lex_token="${_EMPTY_TOKEN_}"
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            lex_token="('${lex_c}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_PLUS_SIGN_}"|"${_DIV_}"|"\${_MUL_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_c}')"
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_MINUS_SIGN_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_c}')"
-            lex_amount_of_processed_chars=1
-         ;;
-         [[:digit:]])
-            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DIGIT_}" <<< ${lex_buff})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${number}')"
-            lex_amount_of_processed_chars="${#number}"
-         ;;
-         "${_DOT_}")
-            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DOT_}" <<< ${lex_buff:1})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${_DOT_}${number}')"
-            lex_amount_of_processed_chars="${#number}+1"
-         ;;
-         "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
-            declare -r _lex_uff_=${lex_buff:1} # remove first (double) quote
-            declare -r _lex_string_="${_lex_uff_%${lex_c}*}" # match text before next (double) quote
-            declare -r -i _lex_string_len_=${#_lex_string_} # determin length of match to verify there is a (double) quote at the end
-            if [[ ${_lex_uff_:${_lex_string_len_}:1} != ${lex_c} ]]; then stop 'A _lex_string_ ran off the end of the program.' '77' ; fi
-            lex_token="('${_STRING_TOKEN_}', '${_lex_string_}')"
-            lex_amount_of_processed_chars="${_lex_string_len_}+2"
-         ;;
-         [[:alpha:]])
-            declare -r _lex_symbol_=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
-            lex_token="('${_SYMBOL_TOKEN_}', '${_lex_symbol_}')"
-            lex_amount_of_processed_chars="${#_lex_symbol_}"
-         ;;
-         "${_TAB_}")
-            stop "Tabs are not allowed in Cell" '1';;
-         *)
-            stop "Unexpected character: >>${lex_c}<<" '1';;
-      esac
-   done
+
+function parse () {
+    return
 }
+
 ################################################################################
-### end of function lex ########################################################
+### end of function parse ######################################################
 ################################################################################
 
 if [[ ${ARG_BUFFER} ]]; then
    declare buff_line="$(tr -d '\n\r\t' <<< ${ARG_BUFFER})" 
    declare buff_line_token="('ARG_BUFFER', '${buff_line}')"
-   lex "${buff_line}" "${buff_line_token}"
+   parse "${buff_line}" "${buff_line_token}"
 fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
    declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipprd while reading INFILE into the array
    declare extra_line_token="('LINE_${line_no}', '${one_line}')" 
-   lex "${one_line}" "${extra_line_token}"
+   parse "${one_line}" "${extra_line_token}"
 done
