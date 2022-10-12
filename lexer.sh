@@ -109,62 +109,62 @@ if [[ ${OPT_DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do e
 ### start of function lex ######################################################
 ################################################################################
 function lex () {
-   declare BUFF="${1}"
-   declare TOKEN="${2}"
-   declare C
-   declare -i AMOUNT_OF_PROCESSED_CHARS=0
+   declare buff="${1}"
+   declare token="${2}"
+   declare c
+   declare -i amount_of_processed_chars=0
    while [[ true ]]; do
-      BUFF=${BUFF:${AMOUNT_OF_PROCESSED_CHARS}:${#BUFF}}
-      C="${BUFF:0:1}"
-      if [[ ! -z ${TOKEN} ]]; then echo "${TOKEN} " >&3 ; fi
+      buff=${buff:${amount_of_processed_chars}:${#buff}}
+      c="${buff:0:1}"
+      if [[ ! -z ${token} ]]; then echo "${token} " >&3 ; fi
       #############################
-      [[ 0 -lt ${#BUFF} ]] || break
+      [[ 0 -lt ${#buff} ]] || break
       #############################      
       if [[ ${OPT_DEBUG} ]]; then
-         echo "TOKEN = »${TOKEN}«"
-         echo "C = »${C}«"              
-         echo "BUFF = »${BUFF}« [${#BUFF}]"
-         echo "AMOUNT_OF_PROCESSED_CHARS = [${AMOUNT_OF_PROCESSED_CHARS}]"
+         echo "token = »${token}«"
+         echo "c = »${c}«"              
+         echo "buff = »${buff}« [${#buff}]"
+         echo "amount_of_processed_chars = [${amount_of_processed_chars}]"
       fi      
-      case "${C}" in
+      case "${c}" in
          [[:space:]]) 
-            TOKEN="${_EMPTY_TOKEN_}"
-            AMOUNT_OF_PROCESSED_CHARS=1
+            token="${_EMPTY_TOKEN_}"
+            amount_of_processed_chars=1
          ;;
          "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            TOKEN="('${C}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
-            AMOUNT_OF_PROCESSED_CHARS=1
+            token="('${c}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
+            amount_of_processed_chars=1
          ;;
          "${_PLUS_SIGN_}"|"${_MINUS_SIGN_}"|"\${_MUL_}"|"${_DIV_}")
-            TOKEN="('${_OPERATION_TOKEN_}', '${C}')"
-            AMOUNT_OF_PROCESSED_CHARS=1
+            token="('${_OPERATION_TOKEN_}', '${c}')"
+            amount_of_processed_chars=1
          ;;
          "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
             pattern="([\ a-zA-Z0-9.:,;%?=&$§^#_\(\)\{\})\[\]]){0,}"
-            string_plus_quotes="$(grep -o -P "[${C}]${pattern}[${C}]" <<< ${BUFF})"
-            if [[ ${string_plus_quotes: -1} != ${C} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
+            string_plus_quotes="$(grep -o -P "[${c}]${pattern}[${c}]" <<< ${buff})"
+            if [[ ${string_plus_quotes: -1} != ${c} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
             string=${string_plus_quotes:1:-1}
-            TOKEN="('${_STRING_TOKEN_}', '${string}')"
-            AMOUNT_OF_PROCESSED_CHARS="${#string_plus_quotes}"
+            token="('${_STRING_TOKEN_}', '${string}')"
+            amount_of_processed_chars="${#string_plus_quotes}"
          ;;
          [[:digit:]]|".")
             sloppy="[-+0-9.]*"
             pattern="(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)"
-            number=$(grep -Eo "${pattern}" <<< ${BUFF})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${sloppy}" <<< ${BUFF})' is not a number" '1' ; fi
-            TOKEN="('${_NUMBER_TOKEN_}', '${number}')"
-            AMOUNT_OF_PROCESSED_CHARS="${#number}"
+            number=$(grep -Eo "${pattern}" <<< ${buff})
+            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${sloppy}" <<< ${buff})' is not a number" '1' ; fi
+            token="('${_NUMBER_TOKEN_}', '${number}')"
+            amount_of_processed_chars="${#number}"
          ;;
          [[:alpha:]])
-            symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)" <<< ${BUFF})
-            TOKEN="('${_SYMBOL_TOKEN_}', '${symbol}')"
-            AMOUNT_OF_PROCESSED_CHARS="${#symbol}"
+            symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)" <<< ${buff})
+            token="('${_SYMBOL_TOKEN_}', '${symbol}')"
+            amount_of_processed_chars="${#symbol}"
          ;;
          "${_TAB_}")
             stop "Tabs are not allowed in Cell" '1'
             ;;
          *)
-            stop "Unexpected character: >>${C}<<" '1'
+            stop "Unexpected character: >>${c}<<" '1'
          ;;
       esac
    done
