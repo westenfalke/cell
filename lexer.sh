@@ -18,7 +18,8 @@ declare -r _COLON_=':'
 declare -r _PLUS_SIGN_='+'
 declare -r _MINUS_SIGN_='-'
 declare -r _EQUAL_SIGN_='='
-declare -r _COMMA_=','_DIV_
+declare -r _DOT_='.'
+declare -r _COMMA_=','
 declare -r _PARAN_OPEN_='('
 declare -r _PARAN_CLOSE_=')'
 declare -r _QUOTE_="'"
@@ -28,6 +29,10 @@ declare -r _CURLY_CLOSE_='}'
 declare -r _MUL_='*'
 declare -r _DIV_='/'
 declare -r _TAB_='\t'
+declare -r _PATTERN_NUMBER_STARTS_WITH_DIGIT_='(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)'
+declare -r _PATTERN_NUMBER_STARTS_WITH_DOT_='[0-9]+'
+declare -r _PATTERN_NUMBER_SLOPPY_='[-+0-9.]*'
+declare -r _PATTERN_ALPHA_='^(([[:alpha:]]+)([[:alnum:][_])*)'
 
 stop() {
    declare -r message=${1:-"OK (/)"}
@@ -43,11 +48,10 @@ usage()
   echo "Usage: ${0} [ -g | --debug ] 
                         [ -b | --buffer a string]
                         [ -c | --char a singe char ] 
-                        [ -e | --expression (operation|string|number|symbol)]
                         [filename]"
 }
 
-PARSED_ARGUMENTS=$(getopt -a -n ${0} -o g,b:c:e: --long debug,buffer:,char:,expression: -- "$@")
+PARSED_ARGUMENTS=$(getopt -a -n ${0} -o g,b:c: --long debug,buffer:,char: -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
@@ -56,7 +60,6 @@ fi
 declare OPT_DEBUG=
 declare ARG_BUFFER=
 declare ARG_CHAR=
-declare ARG_EXPRESSION=
 declare INFLILE=/dev/null
 
 eval set -- "$PARSED_ARGUMENTS"
@@ -66,7 +69,6 @@ do
     -g | --debug)      declare -r OPT_DEBUG=1         ; shift   ;;
     -b | --buffer)     declare -r ARG_BUFFER="$2"     ; shift 2 ;;
     -c | --char)       declare -r ARG_CHAR="$2"       ; shift 2 ;;
-    -e | --expression) declare -r ARG_EXPRESSION="$3" ; shift 2 ;;
     # -- means the end of the arguments; drop this, and break out of the while loop
     --) shift; break ;;
     # If invalid options were passed, then getopt should have reported an error,
@@ -87,7 +89,6 @@ if [[ ${OPT_DEBUG} ]]; then
    echo "OPT_DEBUG      : '${OPT_DEBUG}'"
    echo "ARG_BUFFER     : '${ARG_BUFFER}'"
    echo "ARG_CHAR       : '${ARG_CHAR}'"
-   echo "ARG_EXPRESSION : '${ARG_EXPRESSION}'"
    echo "INFILE         : '${INFLILE}' (alias filename)"
    echo "Parameters remaining are: '${@}'"
 fi
@@ -103,69 +104,68 @@ set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_DEBUG} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
-# remove recursion, hence the use of global variable is sufficient
-
 ################################################################################
 ### start of function lex ######################################################
 ################################################################################
 function lex () {
-   declare buff="${1}"
-   declare token="${2}"
-   declare c
-   declare -i amount_of_processed_chars=0
+   declare lex_buff="${1}"
+   declare lex_token="${2}"
+   declare lex_c
+   declare -i lex_amount_of_processed_chars=0
    while [[ true ]]; do
-      buff=${buff:${amount_of_processed_chars}:${#buff}}
-      c="${buff:0:1}"
-      if [[ ! -z ${token} ]]; then echo "${token} " >&3 ; fi
+      lex_buff=${lex_buff:${lex_amount_of_processed_chars}}
+      lex_c="${lex_buff:0:1}"
+      if [[ ! -z ${lex_token} ]]; then echo "${lex_token} " >&3 ; fi
       #############################
-      [[ 0 -lt ${#buff} ]] || break
+      [[ 0 -lt ${#lex_buff} ]] || break
       #############################      
       if [[ ${OPT_DEBUG} ]]; then
-         echo "token = »${token}«"
-         echo "c = »${c}«"              
-         echo "buff = »${buff}« [${#buff}]"
-         echo "amount_of_processed_chars = [${amount_of_processed_chars}]"
+         echo "lex_token = »${lex_token}« [${lex_amount_of_processed_chars}]"
+         echo "lex_c = »${lex_c}«"              
+         echo "lex_buff = »${lex_buff}« [${#lex_buff}]"
       fi      
-      case "${c}" in
+      case "${lex_c}" in
          [[:space:]]) 
-            token="${_EMPTY_TOKEN_}"
-            amount_of_processed_chars=1
+            lex_token="${_EMPTY_TOKEN_}"
+            lex_amount_of_processed_chars=1
          ;;
          "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            token="('${c}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
-            amount_of_processed_chars=1
+            lex_token="('${lex_c}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
+            lex_amount_of_processed_chars=1
          ;;
          "${_PLUS_SIGN_}"|"${_MINUS_SIGN_}"|"\${_MUL_}"|"${_DIV_}")
-            token="('${_OPERATION_TOKEN_}', '${c}')"
-            amount_of_processed_chars=1
+            lex_token="('${_OPERATION_TOKEN_}', '${lex_c}')"
+            lex_amount_of_processed_chars=1
+         ;;
+         [[:digit:]])
+            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DIGIT_}" <<< ${lex_buff})
+            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
+            lex_token="('${_NUMBER_TOKEN_}', '${number}')"
+            lex_amount_of_processed_chars="${#number}"
+         ;;
+         "${_DOT_}")
+            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DOT_}" <<< ${lex_buff:1})
+            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
+            lex_token="('${_NUMBER_TOKEN_}', '${_DOT_}${number}')"
+            lex_amount_of_processed_chars="${#number}+1"
          ;;
          "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
-            pattern="([\ a-zA-Z0-9.:,;%?=&$§^#_\(\)\{\})\[\]]){0,}"
-            string_plus_quotes="$(grep -o -P "[${c}]${pattern}[${c}]" <<< ${buff})"
-            if [[ ${string_plus_quotes: -1} != ${c} ]]; then stop 'A string ran off the end of the program.' '77' ; fi
-            string=${string_plus_quotes:1:-1}
-            token="('${_STRING_TOKEN_}', '${string}')"
-            amount_of_processed_chars="${#string_plus_quotes}"
-         ;;
-         [[:digit:]]|".")
-            sloppy="[-+0-9.]*"
-            pattern="(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)"
-            number=$(grep -Eo "${pattern}" <<< ${buff})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${sloppy}" <<< ${buff})' is not a number" '1' ; fi
-            token="('${_NUMBER_TOKEN_}', '${number}')"
-            amount_of_processed_chars="${#number}"
+            declare -r _lex_uff_=${lex_buff:1} # remove first (double) quote
+            declare -r _lex_string_="${_lex_uff_%${lex_c}*}" # match text before next (double) quote
+            declare -r -i _lex_string_len_=${#_lex_string_} # determin length of match to verify there is a (double) quote at the end
+            if [[ ${_lex_uff_:${_lex_string_len_}:1} != ${lex_c} ]]; then stop 'A _lex_string_ ran off the end of the program.' '77' ; fi
+            lex_token="('${_STRING_TOKEN_}', '${_lex_string_}')"
+            lex_amount_of_processed_chars="${_lex_string_len_}+2"
          ;;
          [[:alpha:]])
-            symbol=$(grep -o -E "^(([[:alpha:]]+)([[:alnum:][_])*)" <<< ${buff})
-            token="('${_SYMBOL_TOKEN_}', '${symbol}')"
-            amount_of_processed_chars="${#symbol}"
+            declare -r _lex_symbol_=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
+            lex_token="('${_SYMBOL_TOKEN_}', '${_lex_symbol_}')"
+            lex_amount_of_processed_chars="${#_lex_symbol_}"
          ;;
          "${_TAB_}")
-            stop "Tabs are not allowed in Cell" '1'
-            ;;
+            stop "Tabs are not allowed in Cell" '1';;
          *)
-            stop "Unexpected character: >>${c}<<" '1'
-         ;;
+            stop "Unexpected character: >>${lex_c}<<" '1';;
       esac
    done
 }
