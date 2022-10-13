@@ -100,95 +100,35 @@ if [[ ! -r ${INFLILE} ]]; then stop "filename '${INFLILE}' is not readable or do
 declare -r from_source_file=${INFLILE}; 
  
 ORIG_IFS="$IFS"
-IFS=$';\n'
+IFS=$'\n|'
 set +o errexit # -d '' works like a charm, but with exit code (1)?!
-read -d '' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
+read -d '\n' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
 set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
+
 ################################################################################
-### start of function lex ######################################################
+### start of function parse ####################################################
 ################################################################################
-function lex () {
-   declare lex_buff="${1}"
-   declare lex_token="${2}"
-   declare lex_char
-   declare -i lex_amount_of_processed_chars=0
-   while [[ true ]]; do
-      lex_buff=${lex_buff:${lex_amount_of_processed_chars}}
-      lex_char="${lex_buff:0:1}"
-      if [[ ! -z ${lex_token} ]]; then echo "${lex_token} " >&3 ; fi
-      #############################
-      [[ 0 -lt ${#lex_buff} ]] || break
-      #############################      
-      if [[ ${OPT_VERBOSE} ]]; then
-         echo "lex_token = »${lex_token}« [${lex_amount_of_processed_chars}]"
-         echo "lex_char = »${lex_char}«"              
-         echo "lex_buff = »${lex_buff}« [${#lex_buff}]"
-      fi      
-      case "${lex_char}" in
-         [[:space:]]) 
-            lex_token="${_EMPTY_TOKEN_}"
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            lex_token="('${lex_char}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_PLUS_SIGN_}"|"${_DIV_}"|"\${_MUL_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
-            lex_amount_of_processed_chars=1
-         ;;
-         "${_MINUS_SIGN_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
-            lex_amount_of_processed_chars=1
-         ;;
-         [[:digit:]])
-            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DIGIT_}" <<< ${lex_buff})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${number}')"
-            lex_amount_of_processed_chars="${#number}"
-         ;;
-         "${_DOT_}")
-            declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DOT_}" <<< ${lex_buff:1})
-            if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${_DOT_}${number}')"
-            lex_amount_of_processed_chars="${#number}+1"
-         ;;
-         "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
-            declare lex_uff=${lex_buff:1} # remove first (double) quote
-            declare lex_string="${lex_uff%${lex_char}*}" # match text before next (double) quote
-            declare -i lex_stringlen_=${#lex_string} # determin length of match to verify there is a (double) quote at the end
-            if [[ ${lex_uff:${lex_stringlen_}:1} != ${lex_char} ]]; then stop 'A lex_string ran off the end of the program.' '77' ; fi
-            lex_token="('${_STRING_TOKEN_}', '${lex_string}')"
-            lex_amount_of_processed_chars="${lex_stringlen_}+2"
-         ;;
-         [[:alpha:]])
-            declare lex_symbol=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
-            lex_token="('${_SYMBOL_TOKEN_}', '${lex_symbol}')"
-            lex_amount_of_processed_chars="${#lex_symbol}"
-         ;;
-         "${_TAB_}")
-            stop "Tabs are not allowed in Cell" '1';;
-         *)
-            stop "Unexpected character: >>${lex_char}<<" '1';;
-      esac
-   done
+
+function parse () {
+    echo "$@"  >&3
 }
+
 ################################################################################
-### end of function lex ########################################################
+### end of function parse ######################################################
 ################################################################################
 
 if [[ ${ARG_BUFFER} ]]; then
    declare buff_line="$(tr -d '\n\r\t' <<< ${ARG_BUFFER})" 
    declare buff_line_token="('ARG_BUFFER', '${buff_line}')"
-   lex "${buff_line}" "${buff_line_token}"
+   parse "${buff_line}" "${buff_line_token}"
 fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
    declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipprd while reading INFILE into the array
    declare extra_line_token="('LINE_${line_no}', '${one_line}')" 
-   lex "${one_line}" "${extra_line_token}"
+   parse "${one_line}" "${extra_line_token}"
 done
