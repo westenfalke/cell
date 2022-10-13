@@ -100,20 +100,20 @@ if [[ ! -r ${INFLILE} ]]; then stop "filename '${INFLILE}' is not readable or do
 declare -r from_source_file=${INFLILE}; 
  
 ORIG_IFS="$IFS"
-IFS=$';\n'
+IFS=$'\n|'
 set +o errexit # -d '' works like a charm, but with exit code (1)?!
-read -d '' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
+read -d '\n' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
 set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
 
 ################################################################################
-### start of function pars #####################################################
+### start of function parse ####################################################
 ################################################################################
 
 function parse () {
-    return
+    echo "$@"  >&3
 }
 
 ################################################################################

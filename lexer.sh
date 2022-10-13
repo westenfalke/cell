@@ -113,35 +113,35 @@ if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do
 function lex () {
    declare lex_buff="${1}"
    declare lex_token="${2}"
-   declare lex_c
+   declare lex_char
    declare -i lex_amount_of_processed_chars=0
    while [[ true ]]; do
       lex_buff=${lex_buff:${lex_amount_of_processed_chars}}
-      lex_c="${lex_buff:0:1}"
+      lex_char="${lex_buff:0:1}"
       if [[ ! -z ${lex_token} ]]; then echo "${lex_token} " >&3 ; fi
       #############################
       [[ 0 -lt ${#lex_buff} ]] || break
       #############################      
       if [[ ${OPT_VERBOSE} ]]; then
          echo "lex_token = »${lex_token}« [${lex_amount_of_processed_chars}]"
-         echo "lex_c = »${lex_c}«"              
+         echo "lex_char = »${lex_char}«"              
          echo "lex_buff = »${lex_buff}« [${#lex_buff}]"
       fi      
-      case "${lex_c}" in
+      case "${lex_char}" in
          [[:space:]]) 
             lex_token="${_EMPTY_TOKEN_}"
             lex_amount_of_processed_chars=1
          ;;
          "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            lex_token="('${lex_c}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
+            lex_token="('${lex_char}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
             lex_amount_of_processed_chars=1
          ;;
          "${_PLUS_SIGN_}"|"${_DIV_}"|"\${_MUL_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_c}')"
+            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
             lex_amount_of_processed_chars=1
          ;;
          "${_MINUS_SIGN_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_c}')"
+            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
             lex_amount_of_processed_chars=1
          ;;
          [[:digit:]])
@@ -157,22 +157,22 @@ function lex () {
             lex_amount_of_processed_chars="${#number}+1"
          ;;
          "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
-            declare -r _lex_uff_=${lex_buff:1} # remove first (double) quote
-            declare -r _lex_string_="${_lex_uff_%${lex_c}*}" # match text before next (double) quote
-            declare -r -i _lex_string_len_=${#_lex_string_} # determin length of match to verify there is a (double) quote at the end
-            if [[ ${_lex_uff_:${_lex_string_len_}:1} != ${lex_c} ]]; then stop 'A _lex_string_ ran off the end of the program.' '77' ; fi
-            lex_token="('${_STRING_TOKEN_}', '${_lex_string_}')"
-            lex_amount_of_processed_chars="${_lex_string_len_}+2"
+            declare lex_uff=${lex_buff:1} # remove first (double) quote
+            declare lex_string="${lex_uff%${lex_char}*}" # match text before next (double) quote
+            declare -i lex_stringlen_=${#lex_string} # determin length of match to verify there is a (double) quote at the end
+            if [[ ${lex_uff:${lex_stringlen_}:1} != ${lex_char} ]]; then stop 'A lex_string ran off the end of the program.' '77' ; fi
+            lex_token="('${_STRING_TOKEN_}', '${lex_string}')"
+            lex_amount_of_processed_chars="${lex_stringlen_}+2"
          ;;
          [[:alpha:]])
-            declare -r _lex_symbol_=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
-            lex_token="('${_SYMBOL_TOKEN_}', '${_lex_symbol_}')"
-            lex_amount_of_processed_chars="${#_lex_symbol_}"
+            declare lex_symbol=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
+            lex_token="('${_SYMBOL_TOKEN_}', '${lex_symbol}')"
+            lex_amount_of_processed_chars="${#lex_symbol}"
          ;;
          "${_TAB_}")
             stop "Tabs are not allowed in Cell" '1';;
          *)
-            stop "Unexpected character: >>${lex_c}<<" '1';;
+            stop "Unexpected character: >>${lex_char}<<" '1';;
       esac
    done
 }
