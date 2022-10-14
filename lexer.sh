@@ -132,27 +132,27 @@ function lex () {
             lex_amount_of_processed_chars=1
          ;;
          "${_PARAN_OPEN_}"|"${_PARAN_CLOSE_}"|"${_CURLY_OPEN_}"|"${_CURLY_CLOSE_}"|"${_COMMA_}"|"${_SEMICOLON_}"|"${_EQUAL_SIGN_}"|"${_COLON_}")
-            lex_token="('${lex_char}', '${_NO_VALUE_}')" # special character are thier own type, but without a value
+            lex_token="(\"${lex_char}\", \"${_NO_VALUE_}\")" # special character are thier own type, but without a value
             lex_amount_of_processed_chars=1
          ;;
          "${_PLUS_SIGN_}"|"${_DIV_}"|"\${_MUL_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
+            lex_token="(\"${_OPERATION_TOKEN_}\", \"${lex_char}\")"
             lex_amount_of_processed_chars=1
          ;;
          "${_MINUS_SIGN_}")
-            lex_token="('${_OPERATION_TOKEN_}', '${lex_char}')"
+            lex_token="(\"${_OPERATION_TOKEN_}\", \"${lex_char}\")"
             lex_amount_of_processed_chars=1
          ;;
          [[:digit:]])
             declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DIGIT_}" <<< ${lex_buff})
             if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${number}')"
+            lex_token="(\"${_NUMBER_TOKEN_}\", \"${number}\")"
             lex_amount_of_processed_chars="${#number}"
          ;;
          "${_DOT_}")
             declare -r number=$(grep -Eo "${_PATTERN_NUMBER_STARTS_WITH_DOT_}" <<< ${lex_buff:1})
             if [[ ${number} == '' ]]; then stop "'$(grep -Eo "${_PATTERN_NUMBER_SLOPPY_}" <<< ${lex_buff})' is not a number" '1' ; fi
-            lex_token="('${_NUMBER_TOKEN_}', '${_DOT_}${number}')"
+            lex_token="(\"${_NUMBER_TOKEN_}\", \"${_DOT_}${number}\")"
             lex_amount_of_processed_chars="${#number}+1"
          ;;
          "${_QUOTE_}"|"${_DOUBLE_QUOTE_}")
@@ -160,12 +160,12 @@ function lex () {
             declare lex_string="${lex_uff%${lex_char}*}" # match text before next (double) quote
             declare -i lex_stringlen_=${#lex_string} # determin length of match to verify there is a (double) quote at the end
             if [[ ${lex_uff:${lex_stringlen_}:1} != ${lex_char} ]]; then stop 'A lex_string ran off the end of the program.' '77' ; fi
-            lex_token="('${_STRING_TOKEN_}', '${lex_string}')"
+            lex_token="(\"${_STRING_TOKEN_}\", \"${lex_string}\")"
             lex_amount_of_processed_chars="${lex_stringlen_}+2"
          ;;
          [[:alpha:]])
             declare lex_symbol=$(grep -o -E "${_PATTERN_ALPHA_}" <<< ${lex_buff})
-            lex_token="('${_SYMBOL_TOKEN_}', '${lex_symbol}')"
+            lex_token="(\"${_SYMBOL_TOKEN_}\", \"${lex_symbol}\")"
             lex_amount_of_processed_chars="${#lex_symbol}"
          ;;
          "${_TAB_}")
@@ -181,12 +181,11 @@ function lex () {
 
 if [[ ${ARG_BUFFER} ]]; then
    declare buff_line="$(tr -d '\n\r\t' <<< ${ARG_BUFFER})" 
-   declare buff_line_token="('ARG_BUFFER', '${buff_line}')"
-   lex "${buff_line}" "${buff_line_token}"
+   lex "${buff_line}" "${_EMPTY_TOKEN_}"
 fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
-   declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipprd while reading INFILE into the array
+   declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipped while reading INFILE into the array
    lex "${one_line}" "${_EMPTY_TOKEN_}"
 done
