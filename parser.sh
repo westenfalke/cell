@@ -83,7 +83,6 @@ do
   esac
 done
 
-#if [[ ! -z ${@} ]]; then declare -r INFLILE=${1} ; fi # the remaining parameter is supposed to be the filname
 if [[ ! -z ${@} ]]; then INFLILE=${1} ; fi # the remaining parameter is supposed to be the filname
 
 if [[ ${OPT_VERBOSE} ]]; then 
@@ -100,9 +99,9 @@ if [[ ! -r ${INFLILE} ]]; then stop "filename '${INFLILE}' is not readable or do
 declare -r from_source_file=${INFLILE}; 
  
 ORIG_IFS="$IFS"
-IFS=$'\n|'
-set +o errexit # -d '' works like a charm, but with exit code (1)?!
-read -d '\n' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
+IFS=$'\n'
+set +o errexit # don't stop on 'newlines'
+read -d '\n' -a source_code < "${from_source_file}" # -d '' works like a charm, but with exit code (1)?!
 set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
@@ -123,12 +122,11 @@ function parse () {
 if [[ ${ARG_BUFFER} ]]; then
    declare buff_line="$(tr -d '\n\r\t' <<< ${ARG_BUFFER})" 
    declare buff_line_token="('ARG_BUFFER', '${buff_line}')"
-   parse "${buff_line}" "${buff_line_token}"
+   parse "${buff_line}"
 fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
-   declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipprd while reading INFILE into the array
-   declare extra_line_token="('LINE_${line_no}', '${one_line}')" 
-   parse "${one_line}" "${extra_line_token}"
+   declare one_line="${source_code[line_no]}"
+   parse "${one_line}"
 done
