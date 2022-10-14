@@ -57,11 +57,11 @@ if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
 fi
 
-declare OPT_DEBUG=
-declare OPT_VERBOSE=
-declare ARG_BUFFER=
-declare ARG_CHAR=
-declare INFLILE=/dev/null
+declare OPT_DEBUG=''
+declare OPT_VERBOSE=''
+declare ARG_BUFFER=''
+declare ARG_CHAR=''
+declare INFLILE='/dev/null'
 
 eval set -- "$PARSED_ARGUMENTS"
 while :
@@ -188,6 +188,5 @@ fi
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
    declare one_line="${source_code[line_no]}${_SEMICOLON_}" # the semicolon was stipprd while reading INFILE into the array
-   declare extra_line_token="('LINE_${line_no}', '${one_line}')" 
-   lex "${one_line}" "${extra_line_token}"
+   lex "${one_line}" "${_EMPTY_TOKEN_}"
 done
