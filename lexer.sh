@@ -83,7 +83,6 @@ do
   esac
 done
 
-#if [[ ! -z ${@} ]]; then declare -r INFLILE=${1} ; fi # the remaining parameter is supposed to be the filname
 if [[ ! -z ${@} ]]; then INFLILE=${1} ; fi # the remaining parameter is supposed to be the filname
 
 if [[ ${OPT_VERBOSE} ]]; then 
@@ -101,8 +100,8 @@ declare -r from_source_file=${INFLILE};
  
 ORIG_IFS="$IFS"
 IFS=$';\n'
-set +o errexit # -d '' works like a charm, but with exit code (1)?!
-read -d '' -a source_code < "${from_source_file}" # don't stop on 'pipes', 'newlines' and 'semicolons' 
+set +o errexit # don't stop on 'newlines' and 'semicolons'
+read -d '' -a source_code < "${from_source_file}" # -d '' works like a charm, but with exit code (1)?!
 set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
