@@ -134,8 +134,10 @@ function parse () {
          read -d '' -a parse_a_token <<< "${parse_stripped_buff}" # -d '' works like a charm, but with exit code (1)?!
       set -o errexit
       IFS="${ORIG_IFS}"
-      echo "type  = »${parse_a_token[0]:1:-1}«" 
-      echo "value = »${parse_a_token[1]:1:-2}«" 
+      if [[ ${OPT_VERBOSE} ]]; then 
+         echo "type  = »${parse_a_token[0]:1:-1}«" 
+         echo "value = »${parse_a_token[1]:1:-2}«" 
+      fi
       parse_stripped_buff="${_CLEAR_}";
       echo ${parse_buff} >&3
       #############################
