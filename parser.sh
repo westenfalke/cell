@@ -4,6 +4,7 @@ set -o errexit
 set -o nounset
 
 declare -r _EMPTY_TOKEN_=''
+declare -r _CLEAR_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
@@ -112,7 +113,40 @@ if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do
 ################################################################################
 
 function parse () {
-    echo "$@"  >&3
+   declare parse_buff="${1}"
+   declare parse_token="${2}"
+   declare parse_char
+   declare -i parse_amount_of_processed_chars=0
+   while [[ true ]]; do
+      parse_buff=${parse_buff:${parse_amount_of_processed_chars}}
+      parse_char="${parse_buff:0:1}"
+      if [[ ! -z ${parse_token} ]]; then echo "${parse_token} " >&3 ; fi
+      #############################
+      [[ 0 -lt ${#parse_buff} ]] || break
+      #############################      
+      if [[ ${OPT_VERBOSE} ]]; then
+         echo "parse_token = »${parse_token}« [${parse_amount_of_processed_chars}]"
+         echo "parse_char = »${parse_char}«"              
+         echo "parse_buff = »${parse_buff}« [${#parse_buff}]"
+      fi
+ORIG_IFS="${IFS}"
+IFS=$'\t'
+set +o errexit # don't stop on 'newlines'
+      #declare -a parse_a_token <<< "${parse_buff}"
+      #read -d '' r -a parse_a_token <<< "${parse_buff}"
+      #read -d '' -a parse_a_token <<< "${parse_buff:1:-2}"  #this is  working
+      #sed 's/", "/"\t"/' <<< "${parse_buff:1:-2}"
+      #read -d '' -a parse_a_token <<< $(sed 's/", "/"\t"/' <<< "${parse_buff:1:-2}")
+      #read -d '' -a parse_a_token <<< $(sed 's/", "/"\t"/' <<< "${parse_buff}")
+      read -d '' -a parse_a_token <<< "${parse_buff}"
+set -o errexit
+IFS="${ORIG_IFS}"
+      #echo "all   = »${parse_a_token[@]}«" 
+      echo "type  = »${parse_a_token[0]:1:-1}«" 
+      echo "value = »${parse_a_token[1]:1:-2}«" 
+      #stop "paw" '1'
+      parse_buff="${_CLEAR_}";
+   done
 }
 
 ################################################################################
@@ -127,6 +161,6 @@ fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
-   declare one_line="${source_code[line_no]}"
-   parse "${one_line}"
+   declare one_line="${source_code[line_no]:1:-2}"
+   parse "${one_line/, /	}" "${_EMPTY_TOKEN_}" 
 done
