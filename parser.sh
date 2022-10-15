@@ -129,19 +129,12 @@ function parse () {
          echo "parse_char = »${parse_char}«"              
          echo "parse_buff = »${parse_buff}« [${#parse_buff}]"
       fi
-ORIG_IFS="${IFS}"
-IFS=$'\t'
-set +o errexit # don't stop on 'newlines'
-      #declare -a parse_a_token <<< "${parse_buff}"
-      #read -d '' r -a parse_a_token <<< "${parse_buff}"
-      #read -d '' -a parse_a_token <<< "${parse_buff:1:-2}"  #this is  working
-      #sed 's/", "/"\t"/' <<< "${parse_buff:1:-2}"
-      #read -d '' -a parse_a_token <<< $(sed 's/", "/"\t"/' <<< "${parse_buff:1:-2}")
-      #read -d '' -a parse_a_token <<< $(sed 's/", "/"\t"/' <<< "${parse_buff}")
-      read -d '' -a parse_a_token <<< "${parse_buff}"
-set -o errexit
-IFS="${ORIG_IFS}"
-      #echo "all   = »${parse_a_token[@]}«" 
+      ORIG_IFS="${IFS}"
+      IFS=$'\t'
+      set +o errexit # don't stop on 'newlines'
+            read -d '' -a parse_a_token <<< "${parse_buff}" # -d '' works like a charm, but with exit code (1)?!
+      set -o errexit
+      IFS="${ORIG_IFS}"
       echo "type  = »${parse_a_token[0]:1:-1}«" 
       echo "value = »${parse_a_token[1]:1:-2}«" 
       #stop "paw" '1'
