@@ -4,6 +4,7 @@ set -o errexit
 set -o nounset
 
 declare -r _EMPTY_TOKEN_=''
+declare -r _NONE_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
@@ -110,6 +111,8 @@ set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
+declare PREV_TYPE=${_NONE_}
+
 ################################################################################
 ### start of function parse ####################################################
 ################################################################################
@@ -117,14 +120,14 @@ if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do
 function parse () {
    declare -r parse_buff="${1}"
    declare -r parse_token="${2}"
-   declare -i parse_amount_of_processed_chars=0
+   declare -r prev_type="${3}"
+   declare -i parse_amount_of_token="${line_no}"
    while [[ true ]]; do
-      declare parse_stripped_buff=${parse_buff:${parse_amount_of_processed_chars}}
-      parse_stripped_buff="${parse_stripped_buff:1:-2}"
+      declare parse_stripped_buff="${parse_buff:1:-2}"
       parse_stripped_buff=${parse_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       if [[ ! -z ${parse_token} ]]; then echo "${parse_token} " >&3 ; fi
       if [[ ${OPT_VERBOSE} ]]; then
-         echo "parse_token = »${parse_token}« [${parse_amount_of_processed_chars}]"
+         echo "--- line #[${parse_amount_of_token}]"
          echo "parse_buff          = »${parse_buff}« [${#parse_buff}]"
          echo "parse_stripped_buff =  »${parse_stripped_buff/${_TAB_}/${_ESC_TAB_}}«  [${#parse_stripped_buff}]"
       fi
@@ -134,14 +137,49 @@ function parse () {
          read -d '' -a parse_a_token <<< "${parse_stripped_buff}" # -d '' works like a charm, but with exit code (1)?!
       set -o errexit
       IFS="${ORIG_IFS}"
+      declare parse_token_type="${parse_a_token[0]:1:-1}"
+      declare parse_token_value="${parse_a_token[1]:1:-1}" 
       if [[ ${OPT_VERBOSE} ]]; then 
-         echo "type  = »${parse_a_token[0]:1:-1}«" 
-         echo "value = »${parse_a_token[1]:1:-2}«" 
+         echo "prev_type  = »${prev_type}«" 
+         echo "type       = »${parse_token_type}«" 
+         echo "value      = »${parse_token_value}«" 
       fi
+
+      case "${parse_token_type}" in
+         ${_SEMICOLON_})
+            return
+         ;;
+         ${_EQUAL_SIGN_})
+            if [[ ${_SYMBOL_TOKEN_} == ${prev_type} ]]; then
+               echo "(\"assignment\"," >&3
+               echo "   ${source_code[line_no-1]}," >&3
+               echo ")" >&3
+               return
+               echo "   ${source_code[line_no+1]}," >&3
+               echo "   ${source_code[line_no+2]}" >&3
+            fi
+         ;;
+         ${_OPERATION_TOKEN_})
+            #echo "${source_code[line_no+0]}" >&3
+         ;;
+         ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
+            #echo "${source_code[line_no+0]}" >&3
+         ;;
+         ${_PARAN_OPEN_}|${_PARAN_CLOSE_})
+            #echo "${source_code[line_no+0]}" >&3
+         ;;
+         ${_CURLY_OPEN_}|${_CURLY_CLOSE_})
+            #echo "${source_code[line_no+0]}" >&3
+         ;;
+         ${_COMMA_})
+            #echo "${source_code[line_no+0]}" >&3
+         ;;
+         *) stop "unkowm token type »${parse_token_type}« found in line #${line_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
+      esac
+
       parse_stripped_buff="${_CLEAR_}";
-      echo ${parse_buff} >&3
       #############################
-      [[ 0 -lt ${#parse_stripped_buff} ]] || break
+      [[ 0 -lt ${#parse_stripped_buff} ]] || PREV_TYPE="${parse_token_type}"; break
       #############################      
    done
 }
@@ -153,11 +191,11 @@ function parse () {
 if [[ ${ARG_BUFFER} ]]; then
    declare buff_line="$(tr -d '\n\r\t' <<< ${ARG_BUFFER})" 
    declare buff_line_token="('ARG_BUFFER', '${buff_line}')"
-   parse "${buff_line}"
+   parse "${buff_line}" "${_EMPTY_TOKEN_}" "${PREV_TYPE}"
 fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
    declare one_line="${source_code[line_no]}"
-   parse "${one_line}" "${_EMPTY_TOKEN_}" 
+   parse "${one_line:0:-1}" "${_EMPTY_TOKEN_}" "${PREV_TYPE}"
 done

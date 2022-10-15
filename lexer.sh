@@ -4,6 +4,7 @@ set -o errexit
 set -o nounset
 
 declare -r _EMPTY_TOKEN_=''
+declare -r _NONE_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
