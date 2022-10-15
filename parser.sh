@@ -137,6 +137,7 @@ function parse () {
       echo "type  = »${parse_a_token[0]:1:-1}«" 
       echo "value = »${parse_a_token[1]:1:-2}«" 
       parse_stripped_buff="${_CLEAR_}";
+      echo ${parse_buff} >&3
       #############################
       [[ 0 -lt ${#parse_stripped_buff} ]] || break
       #############################      
