@@ -4,12 +4,14 @@ set -o errexit
 set -o nounset
 
 declare -r _EMPTY_TOKEN_=''
-declare -r _CLEAR_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
 declare -r _OPERATION_TOKEN_='operation'
 declare -r _NO_VALUE_=''
+declare -r _CLEAR_=''
+declare -r _SPACE_=' '
+declare -r _SPACE_CLASS_='[[:space:]]'
 declare -r _AMPERSAND_='&'
 declare -r _NEWLINE_='\n'
 declare -r _CARRIAGE_RETURN_='\r'
@@ -29,7 +31,8 @@ declare -r _CURLY_OPEN_='{'
 declare -r _CURLY_CLOSE_='}'
 declare -r _MUL_='*'
 declare -r _DIV_='/'
-declare -r _TAB_='\t'
+declare -r _ESC_TAB_='\t'
+declare -r _TAB_='	'
 declare -r _PATTERN_NUMBER_STARTS_WITH_DIGIT_='(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)'
 declare -r _PATTERN_NUMBER_STARTS_WITH_DOT_='[0-9]+'
 declare -r _PATTERN_NUMBER_SLOPPY_='[-+0-9.]*'
@@ -107,38 +110,36 @@ set -o errexit
 IFS="$ORIG_IFS"
 if [[ ${OPT_VERBOSE} ]]; then echo '---';for element in "${source_code[@]}" ; do echo "$element" ; done ; echo '---'; fi
 
-
 ################################################################################
 ### start of function parse ####################################################
 ################################################################################
 
 function parse () {
-   declare parse_buff="${1}"
-   declare parse_token="${2}"
-   declare parse_char
+   declare -r parse_buff="${1}"
+   declare -r parse_token="${2}"
    declare -i parse_amount_of_processed_chars=0
    while [[ true ]]; do
-      parse_buff=${parse_buff:${parse_amount_of_processed_chars}}
-      parse_char="${parse_buff:0:1}"
+      declare parse_stripped_buff=${parse_buff:${parse_amount_of_processed_chars}}
+      parse_stripped_buff="${parse_stripped_buff:1:-2}"
+      parse_stripped_buff=${parse_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       if [[ ! -z ${parse_token} ]]; then echo "${parse_token} " >&3 ; fi
-      #############################
-      [[ 0 -lt ${#parse_buff} ]] || break
-      #############################      
       if [[ ${OPT_VERBOSE} ]]; then
          echo "parse_token = »${parse_token}« [${parse_amount_of_processed_chars}]"
-         echo "parse_char = »${parse_char}«"              
-         echo "parse_buff = »${parse_buff}« [${#parse_buff}]"
+         echo "parse_buff          = »${parse_buff}« [${#parse_buff}]"
+         echo "parse_stripped_buff =  »${parse_stripped_buff/${_TAB_}/${_ESC_TAB_}}«  [${#parse_stripped_buff}]"
       fi
       ORIG_IFS="${IFS}"
       IFS=$'\t'
       set +o errexit # don't stop on 'newlines'
-            read -d '' -a parse_a_token <<< "${parse_buff}" # -d '' works like a charm, but with exit code (1)?!
+         read -d '' -a parse_a_token <<< "${parse_stripped_buff}" # -d '' works like a charm, but with exit code (1)?!
       set -o errexit
       IFS="${ORIG_IFS}"
       echo "type  = »${parse_a_token[0]:1:-1}«" 
       echo "value = »${parse_a_token[1]:1:-2}«" 
-      #stop "paw" '1'
-      parse_buff="${_CLEAR_}";
+      parse_stripped_buff="${_CLEAR_}";
+      #############################
+      [[ 0 -lt ${#parse_stripped_buff} ]] || break
+      #############################      
    done
 }
 
@@ -154,6 +155,6 @@ fi
 
 amount_of_lines=${#source_code[*]}
 for (( line_no=0; line_no<$(( $amount_of_lines )); line_no++ )); do
-   declare one_line="${source_code[line_no]:1:-2}"
-   parse "${one_line/, /	}" "${_EMPTY_TOKEN_}" 
+   declare one_line="${source_code[line_no]}"
+   parse "${one_line}" "${_EMPTY_TOKEN_}" 
 done

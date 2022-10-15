@@ -1,6 +1,6 @@
-print("first line of cell code");
+print("first: line, of cell code");
 a = .1;
 b = 0.2;
 c = b + 4.002;
 d = 0234
-print("last line of cell code");
+print("last line ), \;(of cell-code!");

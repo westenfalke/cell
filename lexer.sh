@@ -9,6 +9,9 @@ declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
 declare -r _OPERATION_TOKEN_='operation'
 declare -r _NO_VALUE_=''
+declare -r _CLEAR_=''
+declare -r _SPACE_=' '
+declare -r _SPACE_CLASS_='[[:space:]]'
 declare -r _AMPERSAND_='&'
 declare -r _NEWLINE_='\n'
 declare -r _CARRIAGE_RETURN_='\r'
@@ -28,7 +31,8 @@ declare -r _CURLY_OPEN_='{'
 declare -r _CURLY_CLOSE_='}'
 declare -r _MUL_='*'
 declare -r _DIV_='/'
-declare -r _TAB_='\t'
+declare -r _ESC_TAB_='\t'
+declare -r _TAB_='	'
 declare -r _PATTERN_NUMBER_STARTS_WITH_DIGIT_='(^([[:digit:]])*([.][[:digit:]]){,1}([[:digit:]])*)'
 declare -r _PATTERN_NUMBER_STARTS_WITH_DOT_='[0-9]+'
 declare -r _PATTERN_NUMBER_SLOPPY_='[-+0-9.]*'
@@ -127,7 +131,7 @@ function lex () {
          echo "lex_buff = »${lex_buff}« [${#lex_buff}]"
       fi      
       case "${lex_char}" in
-         [[:space:]]) 
+         ${_SPACE_CLASS_}) 
             lex_token="${_EMPTY_TOKEN_}"
             lex_amount_of_processed_chars=1
          ;;
@@ -168,7 +172,7 @@ function lex () {
             lex_token="(\"${_SYMBOL_TOKEN_}\", \"${lex_symbol}\")"
             lex_amount_of_processed_chars="${#lex_symbol}"
          ;;
-         "${_TAB_}")
+         "${_ESC_TAB_}")
             stop "Tabs are not allowed in Cell" '1';;
          *)
             stop "Unexpected character: >>${lex_char}<<" '1';;
