@@ -3,6 +3,19 @@ exec 3>&1 1>&2
 set -o errexit
 set -o nounset
 
+# _VAIABLES_ with underscores are supposed to be R/O alias static,
+# never the less, the _OPT_NAME_ and _ARG_NAME_ vars are declared twice
+# they are initialized neutal/empty to run this script with 'nounset' option.
+# They'll become R/O even if they are not set again during getopt  
+declare _AMOUNT_OF_UNRECOGNIZED_PARAMETER_=
+declare _OPT_DEBUG_LEVEL_=
+declare -i OPT_VERBOSETY_LEVEL=0 # will be risen during getopt -v -vv -vvv
+declare _ARG_BUFFER_=
+declare _ARG_CHAR_=
+declare ARG_INFLILE= # the_TOKEN_ array gets always initialised
+
+# CONST
+declare -r _ARG_THIS_="${0}"
 declare -r -i _VERBOSETY_LEVEL_LOW_=0
 declare -r -i _VERBOSETY_LEVEL_HIGH_=1
 declare -r -i _VERBOSETY_LEVEL_ULTRA_=2
@@ -62,26 +75,17 @@ function stop() {
 ################################################################################
 ### getopt start ###############################################################
 ################################################################################
-# _VAIABLES_ with underscores are supposed to be R/O alias static,
-# never the less, the _OPT_NAME_ and _ARG_NAME_ vars are declared twice
-# they are initialized empty to run this script with 'nounset' option.
-# They'll become R/O even if they are not set again during getopt  
-declare _AMOUNT_OF_UNRECOGNIZED_PARAMETER_=
-declare _OPT_DEBUG_LEVEL_=
-declare -i OPT_VERBOSETY_LEVEL=0
-declare _ARG_BUFFER_=
-declare _ARG_CHAR_=
-declare _ARG_INFLILE_=/dev/null
-declare -r _ARG_THIS_="${0}"
+
 set +o errexit
 _PARSED_ARGUMENTS_=$(getopt -a -n ${_ARG_THIS_} -o h,g,v,b:c: --long help,debug,buffer:,char: -- "$@")
 declare -r -i _AMOUNT_OF_UNRECOGNIZED_OPTIONS_="${?}"
+set -o errexit
 if [ "$_AMOUNT_OF_UNRECOGNIZED_OPTIONS_" -gt '0' ]; then
    usage
    stop "Illegal Argument" '22'
 fi
-set -o errexit
 eval set -- "${_PARSED_ARGUMENTS_}"
+
 while :
 do
 case "$1" in
@@ -91,35 +95,43 @@ case "$1" in
    -b | --buffer) declare -r    _ARG_BUFFER_="$2"       ; shift 2 ;;
    -c | --char)   declare -r    _ARG_CHAR_="$2"         ; shift 2 ;;
    # -- means the end of the arguments; drop this, and break out of the while loop
-   --) shift; break ;;
+   --) shift; 
+      set +o nounset
+      declare -r ARG_INFLILE="${1:-/dev/null}" # the remaining parameter is supposed to be the filname
+      set -o nounset
+      if [[ ! -z ${@} ]]; then shift ; fi # shift only if there was a last parameter
+      if [[ ! -r ${ARG_INFLILE} ]]; then stop "filename '${ARG_INFLILE}' is not readable or does not exist" '22' ; fi
+      break 
+   ;;
    # If invalid options were passed, then getopt should have reported an error,
    # which we checked as _AMOUNT_OF_UNRECOGNIZED_OPTIONS_ when getopt was called...
    *) echo "Famous Last Words - Unexpected option: $1 - this should not happen."
       usage 
       stop "Unkown Parameter or option found" '22'
-
    ;;
 esac
 done
 
-if [[ ! -z ${@} ]]; then _ARG_INFLILE_=${1} ; fi # the remaining parameter is supposed to be the filname
 if [[ ${_VERBOSETY_LEVEL_LOW_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then 
    echo "_PARSED_ARGUMENTS_ is     '$_PARSED_ARGUMENTS_'"
    echo "_OPT_DEBUG_LEVEL_       : '${_OPT_DEBUG_LEVEL_}'"
    echo "OPT_VERBOSETY_LEVEL     : '${OPT_VERBOSETY_LEVEL}'"
    echo "_ARG_BUFFER_            : '${_ARG_BUFFER_}'"
    echo "_ARG_CHAR_              : '${_ARG_CHAR_}'"
-   echo "INFILE                  : '${_ARG_INFLILE_}' (alias filename)"
+   echo "INFILE                  : '${ARG_INFLILE}' (alias filename)"
    echo "Parameters remaining are: '${@}'"
 fi
-if [[ ! -r ${_ARG_INFLILE_} ]]; then stop "filename '${_ARG_INFLILE_}' is not readable or does not exist" '22' ; fi
 if [[ ${_OPT_DEBUG_LEVEL_} ]]; then set -x ; fi
+
+###^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^###
+### getopt done ################################################################
+################################################################################
 
 function read_token () {
    ORIG_IFS="$IFS"
    IFS=$'\n' # don't stop on 'newlines'
    set +o errexit 
-   read -d "${_NEWLINE_}" -r -a _TOKEN_ < "${_ARG_INFLILE_}" # -d '' works like a charm, but with exit code (1)?!
+   read -d "${_NEWLINE_}" -r -a _TOKEN_ < "${1}" # -d '' works like a charm, but with exit code (1)?!
    set -o errexit
    IFS="$ORIG_IFS"
    if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${_TOKEN_[@]}" ; do echo "$element" ; done ; echo '---'; fi
@@ -130,15 +142,15 @@ function read_token () {
 ################################################################################
 function parse () {
    declare -i parse_cur_token_no=${1}
-   declare -r prev_type="${2}"
+   declare -r parse_prev_token_type="${2}"
    while [[ true ]]; do
       declare parse_buff=${_TOKEN_[parse_cur_token_no]}
       declare parse_stripped_buff="${parse_buff:1:-3}"
       parse_stripped_buff=${parse_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "--- token #[${parse_cur_token_no}]"
-         echo "parse_buff          = »${parse_buff}« [${#parse_buff}]"
-         echo "parse_stripped_buff =  »${parse_stripped_buff/${_TAB_}/${_ESC_TAB_}}«  [${#parse_stripped_buff}]"
+         echo "parse_buff            = »${parse_buff}« [${#parse_buff}]"
+         echo "parse_stripped_buff   =  »${parse_stripped_buff/${_TAB_}/${_ESC_TAB_}}«  [${#parse_stripped_buff}]"
       fi
       ORIG_IFS="${IFS}"
       IFS=$'\t'
@@ -149,9 +161,9 @@ function parse () {
       declare parse_token_type="${parse_a_token[0]:1:-1}"
       declare parse_token_value="${parse_a_token[1]:1:-1}" 
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
-         echo "prev_type  = »${prev_type}«" 
-         echo "type       = »${parse_token_type}«" 
-         echo "value      = »${parse_token_value}«" 
+         echo "parse_prev_token_type = »${parse_prev_token_type}«" 
+         echo "type                  = »${parse_token_type}«" 
+         echo "value                 = »${parse_token_value}«" 
       fi
 
       case "${parse_token_type}" in
@@ -159,7 +171,7 @@ function parse () {
             return
          ;;
          ${_EQUAL_SIGN_})
-            if [[ ${_SYMBOL_TOKEN_} == ${prev_type} ]]; then
+            if [[ ${_SYMBOL_TOKEN_} == ${parse_prev_token_type} ]]; then
                echo "(\"assignment\"," >&3
                echo "   ${_TOKEN_[parse_cur_token_no-1]}," >&3
                echo ")" >&3
@@ -188,7 +200,7 @@ function parse () {
 
       parse_stripped_buff="${_CLEAR_}";
       #############################
-      [[ 0 -lt ${#parse_stripped_buff} ]] || PREV_TYPE="${parse_token_type}"; break
+      [[ 0 -lt ${#parse_stripped_buff} ]] || main_prev_token_type="${parse_token_type}"; break
       #############################      
    done
 }
@@ -196,19 +208,21 @@ function parse () {
 ### if [[ ${_ARG_BUFFER_} ]]; then
 ###    declare buff_line="$(tr -d '\n\r\t' <<< ${_ARG_BUFFER_})" 
 ###    declare buff_line_token="('_ARG_BUFFER_', '${buff_line}')"
-###    parse "${buff_line}" "${_EMPTY_TOKEN_}" "${PREV_TYPE}"
+###    parse "${buff_line}" "${_EMPTY_TOKEN_}" "${main_prev_token_type}"
 ### fi
 
-
 function main () {
-   declare PREV_TYPE=${_NONE_}
-   read_token
+   read_token "${ARG_INFLILE}"
+   declare local main_prev_token_type=${_NONE_}
    main_i_amount_of_token=${#_TOKEN_[*]}
-   for (( main_cur_token_no=0; main_cur_token_no<$(( $main_i_amount_of_token )); main_cur_token_no++ )); do
-      parse  "${main_cur_token_no}" "${PREV_TYPE}"
+   for (( main_cur_token_no=0; 
+          main_cur_token_no < $(( $main_i_amount_of_token )); 
+          main_cur_token_no++ )); do
+      parse  "${main_cur_token_no}" "${main_prev_token_type}"
+      if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo "main_prev_token_type  = »${main_prev_token_type}«"; fi
    done
    return 0
 }
 
-main ${@}
+main
  
