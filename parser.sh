@@ -133,38 +133,39 @@ function read_token () {
    ORIG_IFS="$IFS"
    IFS=$'\n' # don't stop on 'newlines'
    set +o errexit 
-   read -d "${_NEWLINE_}" -r -a TOKEN < "${1}" # -d '' works like a charm, but with exit code (1)?!
+   read -d "" -r -a PRE_LOAD_TOKEN<"${1}" # -d '' works like a charm, but with exit code (1)?!
    set -o errexit
    IFS="$ORIG_IFS"
-   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${TOKEN[@]}" ; do echo "$element" ; done ; echo '---'; fi
+   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${PRE_LOAD_TOKEN[@]}" ; do echo "$element" ; done ; echo '---'; fi
 }
 
    declare -A TOKEN_TYPES
    declare -A TOKEN_VALUES
+   declare -a TOKEN
 
 function unwrap_token () {
-   declare -r -i unwrap_token_amount_of_token=${#TOKEN[*]}
-   
+   declare -r -i unwrap_token_amount_of_token=${#PRE_LOAD_TOKEN[*]}
    for (( unwrap_token_no=0; 
           unwrap_token_no < $(( $unwrap_token_amount_of_token )); 
           unwrap_token_no++ )); do
-      declare unwrap_token_buff=${TOKEN[unwrap_token_no]}
-      declare unwrap_token_stripped_buff="${unwrap_token_buff:1:-3}"
-      #TOKEN[unwrap_token_no]="${unwrap_token_stripped_buff}"
+      declare unwrap_token_buff=${PRE_LOAD_TOKEN[unwrap_token_no]:0:-1}
+      TOKEN[unwrap_token_no]="${unwrap_token_buff}"
+      declare unwrap_token_stripped_buff="${unwrap_token_buff:1:-1}"
       declare unwrap_token_tab_buff=${unwrap_token_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "--- token #[${unwrap_token_no}]"
          echo "unwrap_token_buff          = »${unwrap_token_buff}« [${#unwrap_token_buff}]"
-         echo "unwrap_token_tab_buff =  »${unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#unwrap_token_tab_buff}]"
+         echo "unwrap_token_stripped_buff =  »${unwrap_token_stripped_buff}« [${#unwrap_token_stripped_buff}]"
+         echo "unwrap_token_tab_buff      =  »${unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#unwrap_token_tab_buff}]"
       fi
       ORIG_IFS="${IFS}"
       IFS=$'\t'
       set +o errexit # don't stop on 'newlines'
-         read -d '' -a unwrap_token <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
+         read -d '' -a unwrap_token_type_value_pair <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
       set -o errexit
       IFS="${ORIG_IFS}"
-      declare unwrap_token_type="${unwrap_token[${_TOKEN_TYPE_}]:1:-1}"
-      declare unwrap_token_value="${unwrap_token[${_TOKEN_VALUE_}]:1:-1}" 
+      declare unwrap_token_type="${unwrap_token_type_value_pair[${_TOKEN_TYPE_}]:1:-1}"   # unquote
+      declare unwrap_token_value="${unwrap_token_type_value_pair[${_TOKEN_VALUE_}]:1:-1}" # unquote
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
@@ -175,17 +176,16 @@ function unwrap_token () {
    if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
       echo "TOKEN_TYPES"
       for key in "${!TOKEN_TYPES[@]}"; do
-         echo -n "type: ${TOKEN_TYPES[$key]}"
-         echo "${_TAB_}token  : $key, "
+         echo -n "type: »${TOKEN_TYPES[$key]}«"
+         echo "${_TAB_}token  : »$key«"
       done
       echo "TOKEN_VALUES"
       for key in "${!TOKEN_VALUES[@]}"; do
-         echo "token  : $key, "
-         echo "value: ${TOKEN_VALUES[$key]}"
+         echo "token  : »$key«"
+         echo "value: »${TOKEN_VALUES[$key]}«"
       done
    fi
 }
-
 
 function next_expression () {
    declare -r next_expression_curr_token_no="${1}"
