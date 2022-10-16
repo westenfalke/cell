@@ -20,6 +20,8 @@ declare -r -i _VERBOSETY_LEVEL_LOW_=0
 declare -r -i _VERBOSETY_LEVEL_HIGH_=1
 declare -r -i _VERBOSETY_LEVEL_ULTRA_=2
 declare -r _EMPTY_TOKEN_=''
+declare -r -i _TOKEN_TYPE_=0
+declare -r -i _TOKEN_VALUE_=1
 declare -r _NONE_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
@@ -131,35 +133,76 @@ function read_token () {
    ORIG_IFS="$IFS"
    IFS=$'\n' # don't stop on 'newlines'
    set +o errexit 
-   read -d "${_NEWLINE_}" -r -a _TOKEN_ < "${1}" # -d '' works like a charm, but with exit code (1)?!
+   read -d "${_NEWLINE_}" -r -a TOKEN < "${1}" # -d '' works like a charm, but with exit code (1)?!
    set -o errexit
    IFS="$ORIG_IFS"
-   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${_TOKEN_[@]}" ; do echo "$element" ; done ; echo '---'; fi
+   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${TOKEN[@]}" ; do echo "$element" ; done ; echo '---'; fi
+}
+
+   declare -A TOKEN_TYPES
+   declare -A TOKEN_VALUES
+
+function unwrap_token () {
+   declare -r -i unwrap_token_amount_of_token=${#TOKEN[*]}
+   
+   for (( unwrap_token_no=0; 
+          unwrap_token_no < $(( $unwrap_token_amount_of_token )); 
+          unwrap_token_no++ )); do
+      declare unwrap_token_buff=${TOKEN[unwrap_token_no]}
+      declare unwrap_token_stripped_buff="${unwrap_token_buff:1:-3}"
+      #TOKEN[unwrap_token_no]="${unwrap_token_stripped_buff}"
+      declare unwrap_token_tab_buff=${unwrap_token_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
+      if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
+         echo "--- token #[${unwrap_token_no}]"
+         echo "unwrap_token_buff          = »${unwrap_token_buff}« [${#unwrap_token_buff}]"
+         echo "unwrap_token_tab_buff =  »${unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#unwrap_token_tab_buff}]"
+      fi
+      ORIG_IFS="${IFS}"
+      IFS=$'\t'
+      set +o errexit # don't stop on 'newlines'
+         read -d '' -a unwrap_token <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
+      set -o errexit
+      IFS="${ORIG_IFS}"
+      declare unwrap_token_type="${unwrap_token[${_TOKEN_TYPE_}]:1:-1}"
+      declare unwrap_token_value="${unwrap_token[${_TOKEN_VALUE_}]:1:-1}" 
+      if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
+         echo "unwrap_token_type          = »${unwrap_token_type}«" 
+         echo "unwrap_token_value         = »${unwrap_token_value}«" 
+      fi
+      TOKEN_TYPES["${unwrap_token_buff}"]="${unwrap_token_type}"
+      TOKEN_VALUES["${unwrap_token_buff}"]="${unwrap_token_value}"
+   done
+   if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
+      echo "TOKEN_TYPES"
+      for key in "${!TOKEN_TYPES[@]}"; do
+         echo -n "type: ${TOKEN_TYPES[$key]}"
+         echo "${_TAB_}token  : $key, "
+      done
+      echo "TOKEN_VALUES"
+      for key in "${!TOKEN_VALUES[@]}"; do
+         echo "token  : $key, "
+         echo "value: ${TOKEN_VALUES[$key]}"
+      done
+   fi
+}
+
+
+function next_expression () {
+   declare -r next_expression_curr_token_no="${1}"
+   declare -r next_expression_curr_token_type="${2}"
+   declare -r next_expression_prev_token_type="${3}"
 }
 
 ################################################################################
 ### start of function parse ####################################################
 ################################################################################
 function parse () {
-   declare -i parse_cur_token_no=${1}
+   declare -i parse_curr_token_no=${1}
    declare -r parse_prev_token_type="${2}"
    while [[ true ]]; do
-      declare parse_buff=${_TOKEN_[parse_cur_token_no]}
-      declare parse_stripped_buff="${parse_buff:1:-3}"
-      parse_stripped_buff=${parse_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
-      if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
-         echo "--- token #[${parse_cur_token_no}]"
-         echo "parse_buff            = »${parse_buff}« [${#parse_buff}]"
-         echo "parse_stripped_buff   =  »${parse_stripped_buff/${_TAB_}/${_ESC_TAB_}}«  [${#parse_stripped_buff}]"
-      fi
-      ORIG_IFS="${IFS}"
-      IFS=$'\t'
-      set +o errexit # don't stop on 'newlines'
-         read -d '' -a parse_a_token <<< "${parse_stripped_buff}" # -d '' works like a charm, but with exit code (1)?!
-      set -o errexit
-      IFS="${ORIG_IFS}"
-      declare parse_token_type="${parse_a_token[0]:1:-1}"
-      declare parse_token_value="${parse_a_token[1]:1:-1}" 
+      declare parse_buff=${TOKEN[parse_curr_token_no]}
+      declare parse_token_type="${TOKEN_TYPES[${parse_buff}]}"
+      declare parse_token_value="${TOKEN_VALUES[${parse_buff}]}" 
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "parse_prev_token_type = »${parse_prev_token_type}«" 
          echo "type                  = »${parse_token_type}«" 
@@ -173,29 +216,29 @@ function parse () {
          ${_EQUAL_SIGN_})
             if [[ ${_SYMBOL_TOKEN_} == ${parse_prev_token_type} ]]; then
                echo "(\"assignment\"," >&3
-               echo "   ${_TOKEN_[parse_cur_token_no-1]}," >&3
+               echo "   ${TOKEN[parse_curr_token_no-1]}," >&3
                echo ")" >&3
                return
-               echo "   ${_TOKEN_[parse_cur_token_no+1]}," >&3
-               echo "   ${_TOKEN_[parse_cur_token_no+2]}" >&3
+               echo "   ${TOKEN[parse_curr_token_no+1]}," >&3
+               echo "   ${TOKEN[parse_curr_token_no+2]}" >&3
             fi
          ;;
          ${_OPERATION_TOKEN_})
-            #echo "${_TOKEN_[parse_cur_token_no+0]}" >&3
+            echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
-            #echo "${_TOKEN_[parse_cur_token_no+0]}" >&3
+            echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_PARAN_OPEN_}|${_PARAN_CLOSE_})
-            #echo "${_TOKEN_[parse_cur_token_no+0]}" >&3
+            echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_CURLY_OPEN_}|${_CURLY_CLOSE_})
-            #echo "${_TOKEN_[parse_cur_token_no+0]}" >&3
+            echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_COMMA_})
-            #echo "${_TOKEN_[parse_cur_token_no+0]}" >&3
+            echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
-         *) stop "unkowm token type »${parse_token_type}« found in line #${parse_cur_token_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
+         *) stop "unkowm token type »${parse_token_type}« found in line #${parse_curr_token_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
       esac
 
       parse_stripped_buff="${_CLEAR_}";
@@ -213,16 +256,17 @@ function parse () {
 
 function main () {
    read_token "${ARG_INFLILE}"
+   unwrap_token
    declare local main_prev_token_type=${_NONE_}
-   main_i_amount_of_token=${#_TOKEN_[*]}
-   for (( main_cur_token_no=0; 
-          main_cur_token_no < $(( $main_i_amount_of_token )); 
-          main_cur_token_no++ )); do
-      parse  "${main_cur_token_no}" "${main_prev_token_type}"
+   declare -r -i main_amount_of_token=${#TOKEN[*]}
+   for (( main_curr_token_no=0; 
+          main_curr_token_no < $(( $main_amount_of_token )); 
+          main_curr_token_no++ )); do
+      #           self                       prev                 stop_at
+      parse  "${main_curr_token_no}" "${main_prev_token_type}" ""
       if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo "main_prev_token_type  = »${main_prev_token_type}«"; fi
    done
    return 0
 }
-
 main
  
