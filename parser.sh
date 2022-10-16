@@ -3,6 +3,19 @@ exec 3>&1 1>&2
 set -o errexit
 set -o nounset
 
+# _VAIABLES_ with underscores are supposed to be R/O alias static,
+# never the less, the _OPT_NAME_ and _ARG_NAME_ vars are declared twice
+# they are initialized neutal/empty to run this script with 'nounset' option.
+# They'll become R/O even if they are not set again during getopt  
+declare _AMOUNT_OF_UNRECOGNIZED_PARAMETER_=
+declare _OPT_DEBUG_LEVEL_=
+declare -i OPT_VERBOSETY_LEVEL=0 # will be risen during getopt -v -vv -vvv
+declare _ARG_BUFFER_=
+declare _ARG_CHAR_=
+declare ARG_INFLILE= # the_TOKEN_ array gets always initialised
+
+# CONST
+declare -r _ARG_THIS_="${0}"
 declare -r -i _VERBOSETY_LEVEL_LOW_=0
 declare -r -i _VERBOSETY_LEVEL_HIGH_=1
 declare -r -i _VERBOSETY_LEVEL_ULTRA_=2
@@ -62,16 +75,17 @@ function stop() {
 ################################################################################
 ### getopt start ###############################################################
 ################################################################################
-function init_opts_n_args () {   
+
 set +o errexit
 _PARSED_ARGUMENTS_=$(getopt -a -n ${_ARG_THIS_} -o h,g,v,b:c: --long help,debug,buffer:,char: -- "$@")
 declare -r -i _AMOUNT_OF_UNRECOGNIZED_OPTIONS_="${?}"
+set -o errexit
 if [ "$_AMOUNT_OF_UNRECOGNIZED_OPTIONS_" -gt '0' ]; then
    usage
    stop "Illegal Argument" '22'
 fi
-set -o errexit
 eval set -- "${_PARSED_ARGUMENTS_}"
+
 while :
 do
 case "$1" in
@@ -81,18 +95,23 @@ case "$1" in
    -b | --buffer) declare -r    _ARG_BUFFER_="$2"       ; shift 2 ;;
    -c | --char)   declare -r    _ARG_CHAR_="$2"         ; shift 2 ;;
    # -- means the end of the arguments; drop this, and break out of the while loop
-   --) shift; break ;;
+   --) shift; 
+      set +o nounset
+      declare -r ARG_INFLILE="${1:-/dev/null}" # the remaining parameter is supposed to be the filname
+      set -o nounset
+      if [[ ! -z ${@} ]]; then shift ; fi # shift only if there was a last parameter
+      if [[ ! -r ${ARG_INFLILE} ]]; then stop "filename '${ARG_INFLILE}' is not readable or does not exist" '22' ; fi
+      break 
+   ;;
    # If invalid options were passed, then getopt should have reported an error,
    # which we checked as _AMOUNT_OF_UNRECOGNIZED_OPTIONS_ when getopt was called...
    *) echo "Famous Last Words - Unexpected option: $1 - this should not happen."
       usage 
       stop "Unkown Parameter or option found" '22'
-
    ;;
 esac
 done
 
-if [[ ! -z ${@} ]]; then ARG_INFLILE=${1} && shift ; fi # the remaining parameter is supposed to be the filname
 if [[ ${_VERBOSETY_LEVEL_LOW_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then 
    echo "_PARSED_ARGUMENTS_ is     '$_PARSED_ARGUMENTS_'"
    echo "_OPT_DEBUG_LEVEL_       : '${_OPT_DEBUG_LEVEL_}'"
@@ -102,15 +121,17 @@ if [[ ${_VERBOSETY_LEVEL_LOW_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
    echo "INFILE                  : '${ARG_INFLILE}' (alias filename)"
    echo "Parameters remaining are: '${@}'"
 fi
-if [[ ! -r ${ARG_INFLILE} ]]; then stop "filename '${ARG_INFLILE}' is not readable or does not exist" '22' ; fi
 if [[ ${_OPT_DEBUG_LEVEL_} ]]; then set -x ; fi
-}
+
+###^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^###
+### getopt done ################################################################
+################################################################################
 
 function read_token () {
    ORIG_IFS="$IFS"
    IFS=$'\n' # don't stop on 'newlines'
    set +o errexit 
-   read -d "${_NEWLINE_}" -r -a _TOKEN_ < "${ARG_INFLILE}" # -d '' works like a charm, but with exit code (1)?!
+   read -d "${_NEWLINE_}" -r -a _TOKEN_ < "${1}" # -d '' works like a charm, but with exit code (1)?!
    set -o errexit
    IFS="$ORIG_IFS"
    if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${_TOKEN_[@]}" ; do echo "$element" ; done ; echo '---'; fi
@@ -190,21 +211,9 @@ function parse () {
 ###    parse "${buff_line}" "${_EMPTY_TOKEN_}" "${main_prev_token_type}"
 ### fi
 
-# _VAIABLES_ with underscores are supposed to be R/O alias static,
-# never the less, the _OPT_NAME_ and _ARG_NAME_ vars are declared twice
-# they are initialized neutal/empty to run this script with 'nounset' option.
-# They'll become R/O even if they are not set again during getopt  
-declare -r _ARG_THIS_="${0}"
-declare _AMOUNT_OF_UNRECOGNIZED_PARAMETER_=
-declare _OPT_DEBUG_LEVEL_=
-declare -i OPT_VERBOSETY_LEVEL=0 # will be risen during getopt -v -vv -vvv
-declare _ARG_BUFFER_=
-declare _ARG_CHAR_=
-declare ARG_INFLILE=/dev/null # the_TOKEN_ array gets always initialised
 function main () {
-   init_opts_n_args "${@}"
+   read_token "${ARG_INFLILE}"
    declare local main_prev_token_type=${_NONE_}
-   read_token
    main_i_amount_of_token=${#_TOKEN_[*]}
    for (( main_cur_token_no=0; 
           main_cur_token_no < $(( $main_i_amount_of_token )); 
@@ -215,5 +224,5 @@ function main () {
    return 0
 }
 
-main "${@}"
+main
  
