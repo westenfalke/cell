@@ -20,9 +20,10 @@ declare -r -i _VERBOSETY_LEVEL_LOW_=0
 declare -r -i _VERBOSETY_LEVEL_HIGH_=1
 declare -r -i _VERBOSETY_LEVEL_ULTRA_=2
 declare -r _EMPTY_TOKEN_=''
+declare -r -i _TOKEN_NO_NONE_=-1
 declare -r -i _TOKEN_TYPE_=0
 declare -r -i _TOKEN_VALUE_=1
-declare -r _NONE_=''
+declare -r _TOKEN_TYPE_NONE_=''
 declare -r _SYMBOL_TOKEN_='symbol'
 declare -r _STRING_TOKEN_='string'
 declare -r _NUMBER_TOKEN_='number'
@@ -161,11 +162,11 @@ function unwrap_token () {
       ORIG_IFS="${IFS}"
       IFS=$'\t'
       set +o errexit # don't stop on 'newlines'
-         read -d '' -a unwrap_token_type_value_pair <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
+         read -d '\t' -a unwrap_token_type_value_pair <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
       set -o errexit
       IFS="${ORIG_IFS}"
       declare unwrap_token_type="${unwrap_token_type_value_pair[${_TOKEN_TYPE_}]:1:-1}"   # unquote
-      declare unwrap_token_value="${unwrap_token_type_value_pair[${_TOKEN_VALUE_}]:1:-1}" # unquote
+      declare unwrap_token_value="${unwrap_token_type_value_pair[${_TOKEN_VALUE_}]:1:-2}" # unquote un[[:space:]]
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
@@ -188,9 +189,24 @@ function unwrap_token () {
 }
 
 function next_expression () {
-   declare -r next_expression_curr_token_no="${1}"
-   declare -r next_expression_curr_token_type="${2}"
-   declare -r next_expression_prev_token_type="${3}"
+   declare -r -i next_expression_curr_token_no="${1}"
+   declare -r -i next_expression_prev_token_no="${2}"
+   declare -r next_expression_stop_at_type="${3}"
+   declare -r next_expression_curr_token=${TOKEN[${next_expression_curr_token_no}]}
+   declare -r next_expression_curr_token_type=${TOKEN_TYPES[${next_expression_curr_token}]}
+   if [[ ${_TOKEN_NO_NONE_} -eq next_expression_prev_token_no ]]; then
+      case "${next_expression_curr_token_type}" in
+         ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
+            echo ${next_expression_curr_token} >&3
+         ;;
+         *) stop "unexpected token '${next_expression_curr_token}'" 1 ;;
+      esac
+   fi
+
+   #declare -r next_expression_prev_token=${TOKEN[${next_expression_prev_token_no}]}
+   #declare -r next_expression_prev_token_type=${TOKEN_TYPES[${next_expression_prev_token}]}
+
+   return 
 }
 
 ################################################################################
@@ -210,33 +226,32 @@ function parse () {
       fi
 
       case "${parse_token_type}" in
-         ${_SEMICOLON_})
-            return
-         ;;
+         ${_SEMICOLON_}) ;; # ignore so far
          ${_EQUAL_SIGN_})
-            if [[ ${_SYMBOL_TOKEN_} == ${parse_prev_token_type} ]]; then
-               echo "(\"assignment\"," >&3
-               echo "   ${TOKEN[parse_curr_token_no-1]}," >&3
-               echo ")" >&3
-               return
-               echo "   ${TOKEN[parse_curr_token_no+1]}," >&3
-               echo "   ${TOKEN[parse_curr_token_no+2]}" >&3
-            fi
+            #if [[ ${_SYMBOL_TOKEN_} == ${parse_prev_token_type} ]]; then
+            #   echo "(\"assignment\"," >&3
+            #   echo "   ${TOKEN[parse_curr_token_no-1]}," >&3
+            #   echo ")" >&3
+            #   return
+            #   echo "   ${TOKEN[parse_curr_token_no+1]}," >&3
+            #   echo "   ${TOKEN[parse_curr_token_no+2]}" >&3
+            #fi
          ;;
          ${_OPERATION_TOKEN_})
-            echo "${TOKEN[parse_curr_token_no+0]}" >&3
+            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
-            echo "${TOKEN[parse_curr_token_no+0]}" >&3
+            next_expression "${parse_curr_token_no}" "${_TOKEN_NO_NONE_}" ${_SEMICOLON_}
+            #return
          ;;
          ${_PARAN_OPEN_}|${_PARAN_CLOSE_})
-            echo "${TOKEN[parse_curr_token_no+0]}" >&3
+            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_CURLY_OPEN_}|${_CURLY_CLOSE_})
-            echo "${TOKEN[parse_curr_token_no+0]}" >&3
+            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          ${_COMMA_})
-            echo "${TOKEN[parse_curr_token_no+0]}" >&3
+            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
          ;;
          *) stop "unkowm token type »${parse_token_type}« found in line #${parse_curr_token_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
       esac
@@ -257,14 +272,16 @@ function parse () {
 function main () {
    read_token "${ARG_INFLILE}"
    unwrap_token
-   declare local main_prev_token_type=${_NONE_}
+   declare local main_prev_token_type=${_TOKEN_TYPE_NONE_}
    declare -r -i main_amount_of_token=${#TOKEN[*]}
    for (( main_curr_token_no=0; 
           main_curr_token_no < $(( $main_amount_of_token )); 
           main_curr_token_no++ )); do
-      #           self                       prev                 stop_at
-      parse  "${main_curr_token_no}" "${main_prev_token_type}" ""
+      declare main_curr_token=${TOKEN[${main_curr_token_no}]}
       if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo "main_prev_token_type  = »${main_prev_token_type}«"; fi
+      #           self                       prev                 stop_at
+      parse  "${main_curr_token_no}" "${main_prev_token_type}" "${_SEMICOLON_}"
+      main_prev_token_type=${TOKEN_TYPES[${main_curr_token}]}
    done
    return 0
 }
