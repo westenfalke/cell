@@ -58,6 +58,12 @@ declare -r _PATTERN_NUMBER_STARTS_WITH_DOT_='[0-9]+'
 declare -r _PATTERN_NUMBER_SLOPPY_='[-+0-9.]*'
 declare -r _PATTERN_ALPHA_='^(([[:alpha:]]+)([[:alnum:][_])*)'
 
+declare -a TOKEN
+declare -A MAP_TO_TYPE
+declare -A MAP_TO_VALUE
+declare -i AMOUNT_OF_TOKEN_TO_PARSE=0
+declare -i PARSED_TOKEN=0
+
 function usage()
 {
   echo "Usage: ${_ARG_THIS_} [ -g | --debug ] [ -h | --help ] [-v | -vv | -vvv] verbose
@@ -140,12 +146,10 @@ function read_token () {
    if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${PRE_LOAD_TOKEN[@]}" ; do echo "$element" ; done ; echo '---'; fi
 }
 
-   declare -A TOKEN_TYPES
-   declare -A TOKEN_VALUES
-   declare -a TOKEN
 
 function unwrap_token () {
    declare -r -i unwrap_token_amount_of_token=${#PRE_LOAD_TOKEN[*]}
+   AMOUNT_OF_TOKEN_TO_PARSE=unwrap_token_amount_of_token
    for (( unwrap_token_no=0; 
           unwrap_token_no < $(( $unwrap_token_amount_of_token )); 
           unwrap_token_no++ )); do
@@ -171,19 +175,24 @@ function unwrap_token () {
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
       fi
-      TOKEN_TYPES["${unwrap_token_buff}"]="${unwrap_token_type}"
-      TOKEN_VALUES["${unwrap_token_buff}"]="${unwrap_token_value}"
+      MAP_TO_TYPE["${unwrap_token_buff}"]="${unwrap_token_type}"
+      MAP_TO_VALUE["${unwrap_token_buff}"]="${unwrap_token_value}"
    done
    if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
-      echo "TOKEN_TYPES"
-      for key in "${!TOKEN_TYPES[@]}"; do
-         echo -n "type: »${TOKEN_TYPES[$key]}«"
-         echo "${_TAB_}token  : »$key«"
+      echo "TOKEN"
+      for key in "${!TOKEN[@]}"; do
+         echo -n "key:${_TAB_}[${key}]${_TAB_}"
+         echo    "value: »${TOKEN[$key]}«"
       done
-      echo "TOKEN_VALUES"
-      for key in "${!TOKEN_VALUES[@]}"; do
+      echo "MAP_TO_TYPE"
+      for key in "${!MAP_TO_TYPE[@]}"; do
          echo "token  : »$key«"
-         echo "value: »${TOKEN_VALUES[$key]}«"
+         echo "     type: »${MAP_TO_TYPE[$key]}«"
+      done
+      echo "MAP_TO_VALUE"
+      for key in "${!MAP_TO_VALUE[@]}"; do
+         echo "token  : »$key«"
+         echo "              value: »${MAP_TO_VALUE[$key]}«"
       done
    fi
 }
@@ -193,7 +202,9 @@ function next_expression () {
    declare -r -i next_expression_prev_token_no="${2}"
    declare -r next_expression_stop_at_type="${3}"
    declare -r next_expression_curr_token=${TOKEN[${next_expression_curr_token_no}]}
-   declare -r next_expression_curr_token_type=${TOKEN_TYPES[${next_expression_curr_token}]}
+   declare -r next_expression_curr_token_type=${MAP_TO_TYPE[${next_expression_curr_token}]}
+   declare -r next_expression_prev_token=${TOKEN[${next_expression_prev_token_no}]}
+   declare -r next_expression_prev_token_type=${MAP_TO_TYPE[${next_expression_prev_token}]}
    if [[ ${_TOKEN_NO_NONE_} -eq next_expression_prev_token_no ]]; then
       case "${next_expression_curr_token_type}" in
          ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
@@ -203,8 +214,6 @@ function next_expression () {
       esac
    fi
 
-   #declare -r next_expression_prev_token=${TOKEN[${next_expression_prev_token_no}]}
-   #declare -r next_expression_prev_token_type=${TOKEN_TYPES[${next_expression_prev_token}]}
 
    return 
 }
@@ -217,8 +226,8 @@ function parse () {
    declare -r parse_prev_token_type="${2}"
    while [[ true ]]; do
       declare parse_buff=${TOKEN[parse_curr_token_no]}
-      declare parse_token_type="${TOKEN_TYPES[${parse_buff}]}"
-      declare parse_token_value="${TOKEN_VALUES[${parse_buff}]}" 
+      declare parse_token_type="${MAP_TO_TYPE[${parse_buff}]}"
+      declare parse_token_value="${MAP_TO_VALUE[${parse_buff}]}" 
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "parse_prev_token_type = »${parse_prev_token_type}«" 
          echo "type                  = »${parse_token_type}«" 
@@ -226,32 +235,26 @@ function parse () {
       fi
 
       case "${parse_token_type}" in
-         ${_SEMICOLON_}) ;; # ignore so far
+         ${_SEMICOLON_}) 
+
+         ;;
          ${_EQUAL_SIGN_})
-            #if [[ ${_SYMBOL_TOKEN_} == ${parse_prev_token_type} ]]; then
-            #   echo "(\"assignment\"," >&3
-            #   echo "   ${TOKEN[parse_curr_token_no-1]}," >&3
-            #   echo ")" >&3
-            #   return
-            #   echo "   ${TOKEN[parse_curr_token_no+1]}," >&3
-            #   echo "   ${TOKEN[parse_curr_token_no+2]}" >&3
-            #fi
+
          ;;
          ${_OPERATION_TOKEN_})
-            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
+
          ;;
          ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
-            next_expression "${parse_curr_token_no}" "${_TOKEN_NO_NONE_}" ${_SEMICOLON_}
-            #return
+
          ;;
          ${_PARAN_OPEN_}|${_PARAN_CLOSE_})
-            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
+
          ;;
          ${_CURLY_OPEN_}|${_CURLY_CLOSE_})
-            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
+
          ;;
          ${_COMMA_})
-            #echo "${TOKEN[parse_curr_token_no+0]}" >&3
+
          ;;
          *) stop "unkowm token type »${parse_token_type}« found in line #${parse_curr_token_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
       esac
@@ -263,27 +266,11 @@ function parse () {
    done
 }
 
-### if [[ ${_ARG_BUFFER_} ]]; then
-###    declare buff_line="$(tr -d '\n\r\t' <<< ${_ARG_BUFFER_})" 
-###    declare buff_line_token="('_ARG_BUFFER_', '${buff_line}')"
-###    parse "${buff_line}" "${_EMPTY_TOKEN_}" "${main_prev_token_type}"
-### fi
-
 function main () {
    read_token "${ARG_INFLILE}"
    unwrap_token
-   declare local main_prev_token_type=${_TOKEN_TYPE_NONE_}
-   declare -r -i main_amount_of_token=${#TOKEN[*]}
-   for (( main_curr_token_no=0; 
-          main_curr_token_no < $(( $main_amount_of_token )); 
-          main_curr_token_no++ )); do
-      declare main_curr_token=${TOKEN[${main_curr_token_no}]}
-      if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo "main_prev_token_type  = »${main_prev_token_type}«"; fi
-      #           self                       prev                 stop_at
-      parse  "${main_curr_token_no}" "${main_prev_token_type}" "${_SEMICOLON_}"
-      main_prev_token_type=${TOKEN_TYPES[${main_curr_token}]}
-   done
    return 0
 }
+
 main
  
