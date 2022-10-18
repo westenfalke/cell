@@ -222,19 +222,39 @@ function next_expression () {
 ### start of function parse ####################################################
 ################################################################################
 function parse () {
-   declare -i parse_curr_token_no=${1}
-   declare -r parse_prev_token_type="${2}"
+   parse_stop_at_token=${1}
    while [[ true ]]; do
-      declare parse_buff=${TOKEN[parse_curr_token_no]}
-      declare parse_token_type="${MAP_TO_TYPE[${parse_buff}]}"
-      declare parse_token_value="${MAP_TO_VALUE[${parse_buff}]}" 
+      declare parse_token=${TOKEN[${PARSED_TOKEN}]}
+      declare parse_token_type=${MAP_TO_TYPE[${parse_token}]}
+      #declare parse_token_value=${MAP_TO_VALUE[${parse_token}]}
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
-         echo "parse_prev_token_type = »${parse_prev_token_type}«" 
-         echo "type                  = »${parse_token_type}«" 
-         echo "value                 = »${parse_token_value}«" 
+         echo "PARSED_TOKEN             = [${PARSED_TOKEN}]" 
+         echo "AMOUNT_OF_TOKEN_TO_PARSE = [${AMOUNT_OF_TOKEN_TO_PARSE}]" 
+         echo "parse_stop_at_token      = »${parse_stop_at_token}«" 
+         echo "parse_token              = »${parse_token}«"
+         echo "parse_token_type         = »${parse_token_type}«"
       fi
 
-      case "${parse_token_type}" in
+      if [[ ${parse_stop_at_token} ==  ${parse_token_type} ]]; then
+         declare -i parse_prev_token_no=(${PARSED_TOKEN}-1)
+         declare    parse_prev_token=${TOKEN[${parse_prev_token_no}]}
+         echo ${parse_prev_token} >&3
+         return
+      fi
+      #############################
+      [[ ${PARSED_TOKEN} -lt ${AMOUNT_OF_TOKEN_TO_PARSE} ]] || break
+      #############################      
+      let PARSED_TOKEN=${PARSED_TOKEN}+1
+
+      #declare -i parse_curr_token_no=${AMOUNT_OF_TOKEN_TO_PARSE}
+      #next_expression "${AMOUNT_OF_TOKEN_TO_PARSE}" "${_TOKEN_NO_NONE_}"
+
+
+      #############################
+      [[ ${PARSED_TOKEN} -lt ${AMOUNT_OF_TOKEN_TO_PARSE} ]] || break
+      #############################      
+
+      case "" in
          ${_SEMICOLON_}) 
 
          ;;
@@ -245,7 +265,7 @@ function parse () {
 
          ;;
          ${_SYMBOL_TOKEN_}|${_STRING_TOKEN_}|${_NUMBER_TOKEN_})
-
+            
          ;;
          ${_PARAN_OPEN_}|${_PARAN_CLOSE_})
 
@@ -256,19 +276,17 @@ function parse () {
          ${_COMMA_})
 
          ;;
-         *) stop "unkowm token type »${parse_token_type}« found in line #${parse_curr_token_no} parsing »${parse_buff}« [${#parse_buff}]" '1' ;;
+         #*) stop "UPS" '1' ;;
       esac
 
-      parse_stripped_buff="${_CLEAR_}";
-      #############################
-      [[ 0 -lt ${#parse_stripped_buff} ]] || main_prev_token_type="${parse_token_type}"; break
-      #############################      
    done
 }
 
 function main () {
    read_token "${ARG_INFLILE}"
    unwrap_token
+   #         stop_at
+   parse ${_SEMICOLON_} 
    return 0
 }
 
