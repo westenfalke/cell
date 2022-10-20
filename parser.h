@@ -8,8 +8,8 @@ parser(){
     ${1}.stop_at = ${3}
 
     ${1}.read_token
-    echo "DONE 1"
+    echo "DONE ${1}.read_token"
     ${1}.unwrap_token
-    echo "DONE 2"
+    echo "DONE ${1}.unwrap_token"
 
 }

@@ -51,8 +51,7 @@ obj_properties=()
 
 declare -A obj_map_to_type
 declare -A obj_map_to_value
-declare -a obj_token_at
-
+obj_token_at=()
 
 
 obj.read_token () {
@@ -124,7 +123,12 @@ obj.to_string() {
 }
 
 obj.tokens_to_string() {
-    for obj_index in ${!obj_token_at[@]}; do echo "index [${obj_index}] '${obj_token_at[${obj_index}]}'"; done
+    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
+    echo 'obj_token_at'
+    for obj_token in "${obj_token_at[@]}" ; do echo "obj_token = '${obj_token}'" ; done
+    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
+    for obj_index in ${!obj_properties[@]}; do echo "index [${obj_index}] '${obj_properties[${obj_index}]}'"; done
+    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
 }
 
 obj.property(){

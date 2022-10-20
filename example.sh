@@ -14,8 +14,8 @@ system.stdout.printValue token_parser.filename
 echo '---'
 token_parser.to_string
 echo '---'
-echo printArray
-#token_parser.tokens_to_string
+echo printToken
+token_parser.tokens_to_string
 
 
 
