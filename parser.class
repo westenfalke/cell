@@ -49,71 +49,64 @@ declare -r _PATTERN_ALPHA_='^(([[:alpha:]]+)([[:alnum:][_])*)'
 # property
 obj_properties=()
 
-obj_tokens=()
-
-obj_map_to_type=
-obj_map_to_value=
-obj_token_at=()
+declare -A obj_map_to_type
+declare -A obj_map_to_value
+declare -a obj_token_at
 
 
 
 obj.read_token () {
    echo "obj.read_token"
    ORIG_IFS="$IFS"
-   IFS=$'\n'
-   set +o errexit 
-   read -d "" -r -a  obj_tokens< $(obj.filename)
-   set -o errexit
+   IFS=
+   while read -r obj_line || [[ -n "${obj_line}" ]]; do
+      obj_token_at+=("${obj_line:0:-1}")
+   done < $(obj.filename)
    IFS="$ORIG_IFS"
+   #if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for obj_token in "${PRE_LOAD_TOKEN[@]}" ; do echo "$obj_token" ; done ; echo '---'; fi
+   if [[ true ]]; then echo '---';for obj_token in "${obj_token_at[@]}" ; do echo "obj_token = '${obj_token}'" ; done ; echo '---'; fi
+
 }
 
 
 obj.unwrap_token () {
-   declare -A obj_map_to_type
-   declare -A obj_map_to_value
-   AMOUNT_OF_TOKEN=${#obj_tokens}
-   echo "AMOUNT_OF_TOKEN = ${AMOUNT_OF_TOKEN}"
-   for (( no=0; 
-          no < $(( $AMOUNT_OF_TOKEN )); 
-          no++ )); do
-      declare unwrap_token_buff=${obj_tokens[no]:0:-1}
-      obj_token_at[no]="${unwrap_token_buff}"
-      declare unwrap_token_stripped_buff="${unwrap_token_buff:1:-1}"
-      declare unwrap_token_tab_buff=${unwrap_token_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
+   for obj_token in "${obj_token_at[@]}" ; do
+      declare obj_unwrap_token_stripped_buff="${obj_token:1:-1}"
+      declare obj_unwrap_token_tab_buff=${obj_unwrap_token_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       #if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
       if [[ true ]]; then
-         echo "--- token #[${no}]"
-         echo "unwrap_token_buff          = »${unwrap_token_buff}« [${#unwrap_token_buff}]"
-         echo "unwrap_token_stripped_buff =  »${unwrap_token_stripped_buff}« [${#unwrap_token_stripped_buff}]"
-         echo "unwrap_token_tab_buff      =  »${unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#unwrap_token_tab_buff}]"
+         echo "--- obj_token"
+         echo "obj_token                      = »${obj_token}« [${#obj_token}]"
+         echo "obj_unwrap_token_stripped_buff =  »${obj_unwrap_token_stripped_buff}« [${#obj_unwrap_token_stripped_buff}]"
+         echo "obj_unwrap_token_tab_buff      =  »${obj_unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#obj_unwrap_token_tab_buff}]"
       fi
+      declare unwrap_token_quoted_type
+      declare unwrap_token_quoted_value
       ORIG_IFS="${IFS}"
       IFS=$'\t'
-      set +o errexit # don't stop on 'newlines'
-         read -d '\t' -a unwrap_token_type_value_pair <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
-      set -o errexit
+      read -r unwrap_token_quoted_type unwrap_token_quoted_value <<< "${obj_unwrap_token_tab_buff}"
       IFS="${ORIG_IFS}"
-      declare unwrap_token_type="${unwrap_token_type_value_pair[${_TOKEN_TYPE_}]:1:-1}"   # unquote
-      declare unwrap_token_value="${unwrap_token_type_value_pair[${_TOKEN_VALUE_}]:1:-2}" # unquote un[[:space:]]
+      declare unwrap_token_type="${unwrap_token_quoted_type:1:-1}"   # unquote
+      declare unwrap_token_value="${unwrap_token_quoted_value:1:-1}" # unquote 
       #if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
       if [[ true ]]; then
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
       fi
-      obj_map_to_type["${unwrap_token_buff}"]="${unwrap_token_type}"
-      obj_map_to_value["${unwrap_token_buff}"]="${unwrap_token_value}"
+      obj_map_to_type["${obj_token}"]="${unwrap_token_type}"
+      obj_map_to_value["${obj_token}"]="${unwrap_token_value}"
    done
    #if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
    if [[ true ]]; then
       echo "obj_map_to_type"
-      for token in "${!obj_map_to_type[@]}"; do
-         echo -n "type: »${obj_map_to_type[$token]}«"
-         echo "${_TAB_}token  : »$token"
+      for obj_token in "${!obj_map_to_type[@]}"; do
+         echo -n "type: »${obj_map_to_type[$obj_token]}«"
+         echo "${_TAB_}obj_token  : »$obj_token"
       done
       echo "obj_map_to_value"
-      for token in "${!obj_map_to_value[@]}"; do
-         echo "token  : »$token«"
-         echo "value: »${obj_map_to_value[$token]}«"
+      for obj_token in "${!obj_map_to_value[@]}"; do
+         echo "obj_token  : »$obj_token"
+         echo "value: »${obj_map_to_value[$obj_token]}«"
       done
    fi
 }
@@ -131,7 +124,7 @@ obj.to_string() {
 }
 
 obj.tokens_to_string() {
-    for obj_index in ${!obj_tokens[@]}; do echo "index [${obj_index}] '${obj_tokens[${obj_index}]}'"; done
+    for obj_index in ${!obj_token_at[@]}; do echo "index [${obj_index}] '${obj_token_at[${obj_index}]}'"; done
 }
 
 obj.property(){
