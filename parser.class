@@ -49,10 +49,12 @@ declare -r _PATTERN_ALPHA_='^(([[:alpha:]]+)([[:alnum:][_])*)'
 # property
 obj_properties=()
 
+
 declare -A obj_map_to_type
 declare -A obj_map_to_value
 obj_token_at=()
-
+obj_types=()
+obj_values=()
 
 obj.read_token () {
    echo "obj.read_token"
@@ -92,6 +94,8 @@ obj.unwrap_token () {
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
       fi
+      obj_types+=("${unwrap_token_type}")
+      obj_values+=("${unwrap_token_value}")
       obj_map_to_type["${obj_token}"]="${unwrap_token_type}"
       obj_map_to_value["${obj_token}"]="${unwrap_token_value}"
    done
@@ -110,26 +114,11 @@ obj.unwrap_token () {
    fi
 }
 
-
-
 # properties IDs
 self=0
 filename=1
 stop_at=2
 fail_if_at_end=4
-
-obj.to_string() {
-    for obj_index in ${!obj_properties[@]}; do echo "index [${obj_index}] '${obj_properties[${obj_index}]}'"; done
-}
-
-obj.tokens_to_string() {
-    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
-    echo 'obj_token_at'
-    for obj_token in "${obj_token_at[@]}" ; do echo "obj_token = '${obj_token}'" ; done
-    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
-    for obj_index in ${!obj_properties[@]}; do echo "index [${obj_index}] '${obj_properties[${obj_index}]}'"; done
-    echo 'XXXXXXXXXXXXXXXXXXXXXXXXX'
-}
 
 obj.property(){
     set +u
@@ -140,6 +129,14 @@ obj.property(){
 	echo ${obj_properties[$1]}
     fi
     set -u
+}
+
+obj.to_string() {
+    for obj_index in ${!obj_properties[@]}; do echo "index [${obj_index}] '${obj_properties[${obj_index}]}'"; done
+}
+
+obj.tokens_to_string() {
+    for obj_token_at in "${obj_token_at[@]}" ; do echo "obj_token = '${obj_token_at}'" ; done
 }
 
 obj.self(){
@@ -187,12 +184,37 @@ obj.fail_if_at_end() {
     set -u
 }
 
+obj_prev_token=-1
+obj_next_token=0
+
 obj.token.next(){
-    return
+    echo ${obj_token_at[${obj_next_token}]}
+}
+
+obj.token.prev(){
+    echo ${obj_token_at[${obj_prev_token}]}
+}
+
+obj.type.next(){
+    echo ${obj_types[${obj_next_token}]}
+}
+
+obj.type.prev(){
+    echo ${obj_types[${obj_prev_token}]}
+}
+
+obj.value.next(){
+    echo ${obj_values[${obj_next_token}]}
+}
+
+obj.value.prev(){
+    echo ${obj_values[${obj_prev_token}]}
 }
 
 obj.token.move_next (){
-    return
+    obj_prev_token=obj_next_token
+    let obj_next_token+=1
+    let obj_next_token=(obj_next_token % ${#obj_token_at})
 }
 
 obj.next_expression(){

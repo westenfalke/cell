@@ -17,5 +17,17 @@ echo '---'
 echo printToken
 token_parser.tokens_to_string
 
+for foo in "${token_parser_token_at[@]}" ; do 
+    system.stdout.printString "foo = '${foo}'"
+    system.stdout.printValue token_parser.token.next
+    system.stdout.printValue token_parser.type.next
+    system.stdout.printString "'$(token_parser.value.next)'"
+    token_parser.token.move_next
+    system.stdout.printValue token_parser.token.prev
+    system.stdout.printValue token_parser.type.prev
+    system.stdout.printString "'$(token_parser.value.prev)'"
+done
+
+
 
 
