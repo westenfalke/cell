@@ -61,7 +61,6 @@ declare -r _PATTERN_ALPHA_='^(([[:alpha:]]+)([[:alnum:][_])*)'
 declare -A MAP_TO_TYPE
 declare -A MAP_TO_VALUE
 declare -a TOKEN_AT
-declare -i AMOUNT_OF_TOKEN
 
 function usage()
 {
@@ -137,50 +136,44 @@ if [[ ${_OPT_DEBUG_LEVEL_} ]]; then set -x ; fi
 # int read_token ( void ) 
 function read_token () {
    ORIG_IFS="$IFS"
-   IFS=$'\n' # don't stop on 'newlines'
-   set +o errexit 
-   read -d "" -r -a PRE_LOAD_TOKEN<"${1}" # -d '' works like a charm, but with exit code (1)?!
-   set -o errexit
+   IFS=
+   while read -r obj_line || [[ -n "${obj_line}" ]]; do
+      TOKEN_AT+=("${obj_line:0:-1}")
+   done < ${ARG_INFLILE}
    IFS="$ORIG_IFS"
-   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${PRE_LOAD_TOKEN[@]}" ; do echo "$element" ; done ; echo '---'; fi
+   if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then echo '---';for element in "${TOKEN_AT[@]}" ; do echo "$element" ; done ; echo '---'; fi
 }
 
 
 # int unwrap_token ( void ) 
 # <)/   PRE_LOAD_TOKEN[*]
-# <)/(> AMOUNT_OF_TOKEN   
 # <)/(> TOKEN_AT
 # <)/(> MAP_TO_TYPE
 # <)/(> MAP_TO_VALUE
 function unwrap_token () {
-   AMOUNT_OF_TOKEN=${#PRE_LOAD_TOKEN[*]}
-   for (( no=0; 
-          no < $(( $AMOUNT_OF_TOKEN )); 
-          no++ )); do
-      declare unwrap_token_buff=${PRE_LOAD_TOKEN[no]:0:-1}
-      TOKEN_AT[no]="${unwrap_token_buff}"
-      declare unwrap_token_stripped_buff="${unwrap_token_buff:1:-1}"
+   for token in "${TOKEN_AT[@]}" ; do
+      declare unwrap_token_stripped_buff="${token:1:-1}"
       declare unwrap_token_tab_buff=${unwrap_token_stripped_buff/${_COMMA_}${_SPACE_}/${_TAB_}} #OK
       if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
-         echo "--- token #[${no}]"
-         echo "unwrap_token_buff          = »${unwrap_token_buff}« [${#unwrap_token_buff}]"
+         echo "--- token"
+         echo "token                      = »${token}« [${#token}]"
          echo "unwrap_token_stripped_buff =  »${unwrap_token_stripped_buff}« [${#unwrap_token_stripped_buff}]"
          echo "unwrap_token_tab_buff      =  »${unwrap_token_tab_buff/${_TAB_}/${_ESC_TAB_}}«  [${#unwrap_token_tab_buff}]"
       fi
+      declare unwrap_token_quoted_type
+      declare unwrap_token_quoted_value
       ORIG_IFS="${IFS}"
       IFS=$'\t'
-      set +o errexit # don't stop on 'newlines'
-         read -d '\t' -a unwrap_token_type_value_pair <<< "${unwrap_token_tab_buff}" # -d '' works like a charm, but with exit code (1)?!
-      set -o errexit
+      read -r unwrap_token_quoted_type unwrap_token_quoted_value <<< "${unwrap_token_tab_buff}"
       IFS="${ORIG_IFS}"
-      declare unwrap_token_type="${unwrap_token_type_value_pair[${_TOKEN_TYPE_}]:1:-1}"   # unquote
-      declare unwrap_token_value="${unwrap_token_type_value_pair[${_TOKEN_VALUE_}]:1:-2}" # unquote un[[:space:]]
+      declare unwrap_token_type="${unwrap_token_quoted_type:1:-1}"   # unquote
+      declare unwrap_token_value="${unwrap_token_quoted_value:1:-1}" # unquote 
       if [[ ${_VERBOSETY_LEVEL_HIGH_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
          echo "unwrap_token_type          = »${unwrap_token_type}«" 
          echo "unwrap_token_value         = »${unwrap_token_value}«" 
       fi
-      MAP_TO_TYPE["${unwrap_token_buff}"]="${unwrap_token_type}"
-      MAP_TO_VALUE["${unwrap_token_buff}"]="${unwrap_token_value}"
+      MAP_TO_TYPE["${token}"]="${unwrap_token_type}"
+      MAP_TO_VALUE["${token}"]="${unwrap_token_value}"
    done
    if [[ ${_VERBOSETY_LEVEL_ULTRA_} -lt ${OPT_VERBOSETY_LEVEL} ]]; then
       echo "MAP_TO_TYPE"
@@ -221,6 +214,7 @@ function parse () {
       esac
    done
 }
+
 
 
 # int main ( void )
